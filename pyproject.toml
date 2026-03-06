@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61", "wheel", "setuptools-scm>=8"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sse_swa_moba_vllm"
+dynamic = ["version"]
+description = "sse_swa_moba_vllm description"
+readme = "README.md"
+requires-python = ">=3.10"
+
+[tool.setuptools]
+packages = ["sse_swa_moba_vllm"]
+
+[tool.setuptools_scm]
+version_scheme = "guess-next-dev"
+local_scheme = "node-and-date"
+tag_regex = "^v(?P<version>\\d+\\.\\d+\\.\\d+.*)$"
+write_to = "sse_swa_moba_vllm/_version.py"
+
+[project.entry-points."vllm.general_plugins"]
+sse_swa_moba_model = "sse_swa_moba_vllm:register_model"
