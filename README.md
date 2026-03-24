@@ -11,13 +11,13 @@ Building on [SpikingBrain1.0](https://github.com/BICLab/SpikingBrain-7B), **Spik
 ## Available Models 🧩
 The model weights are hosted on **ModelScope**. Please select the appropriate version based on your needs:
 
-- **SpikingBrain-2.0-base-8k :** https://www.modelscope.cn/models/Panyuqi/SpikingBrain-2.0-base-8k
-- **SpikingBrain-2.0-base-64k :** https://www.modelscope.cn/models/Panyuqi/SpikingBrain-2.0-base-64k
-- **SpikingBrain-2.0-base-256k :** https://www.modelscope.cn/models/Panyuqi/SpikingBrain-2.0-base-256k
-- **SpikingBrain-2.0-base-512k :** https://www.modelscope.cn/models/Panyuqi/SpikingBrain-2.0-base-512k
-- **SpikingBrain-2.0-instruct :** https://www.modelscope.cn/models/Panyuqi/SpikingBrain-2.0-instruct
-- **SpikingBrain-2.0-think :** https://www.modelscope.cn/models/Panyuqi/SpikingBrain-2.0-think
-- **SpikingBrain-2.0-VL :** https://www.modelscope.cn/models/zhongfangzhi/SpikeBrain-2.0-VL
+- [SpikingBrain-2.0-base-8k](https://www.modelscope.cn/models/Panyuqi/SpikingBrain-2.0-base-8k)
+- [SpikingBrain-2.0-base-64k](https://www.modelscope.cn/models/Panyuqi/SpikingBrain-2.0-base-64k)
+- [SpikingBrain-2.0-base-256k](https://www.modelscope.cn/models/Panyuqi/SpikingBrain-2.0-base-256k)
+- [SpikingBrain-2.0-base-512k](https://www.modelscope.cn/models/Panyuqi/SpikingBrain-2.0-base-512k)
+- [SpikingBrain-2.0-instruct](https://www.modelscope.cn/models/Panyuqi/SpikingBrain-2.0-instruct)
+- [SpikingBrain-2.0-think](https://www.modelscope.cn/models/Panyuqi/SpikingBrain-2.0-think)
+- [SpikingBrain-2.0-VL](https://www.modelscope.cn/models/zhongfangzhi/SpikeBrain-2.0-VL)
 
 ---
 
@@ -40,11 +40,11 @@ SpikingBrain2.0/
 
 This repository includes two important local dependency trees:
 
-### `flash-linear-attention_dev`
+`flash-linear-attention_dev`
 
 This directory contains a **modified version of flash-linear-attention with added SSE support**. In **SpikingBrain2.0**, the [SSE](https://openreview.net/pdf?id=R6DrJ4tnGV) model is built as a **S**parse **S**tate **E**xpansion over [Gated DeltaNet](https://openreview.net/pdf?id=r8H7xhYPwz). By extending the compressed recurrent memory of GDN into multiple sparsely updated state partitions, **SSE** increases effective memory capacity and enhances long-context retrieval, while largely preserving the efficiency benefits of linear recurrent modeling.
 
-### `MoBA`
+ `MoBA`
 
 This directory contains a **MoBA implementation whose interfaces were adapted to the newer FlashAttention API**.
 
