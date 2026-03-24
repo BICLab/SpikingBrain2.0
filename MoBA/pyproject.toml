@@ -1,0 +1,14 @@
+[project]
+name = "moba"
+version = "1.0.0"
+requires-python = ">=3.10"
+description = "MoBA: Mixture of Block Attention for Long-Context LLMs"
+readme = "README.md"
+dynamic = ["dependencies"]
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
+
+[tool.setuptools.packages.find]
+where = ["."]  
+include = ["moba*"] 

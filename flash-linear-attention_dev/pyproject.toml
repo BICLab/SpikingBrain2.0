@@ -1,0 +1,94 @@
+[project]
+name = "flash-linear-attention"
+dynamic = ["version"]
+description = "Fast Triton-based implementations of causal linear attention"
+readme = "README.md"
+authors = [
+    { name = "Songlin Yang", email = "yangsl66@mit.edu" },
+    { name = "Yu Zhang", email = "yzhang.cs@outlook.com" },
+]
+license = { file = "LICENSE" }
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+requires-python = ">=3.10"
+dependencies = [
+    "torch",
+    "transformers",
+    "einops",
+]
+
+[project.optional-dependencies]
+conv1d = ["causal-conv1d>=1.4.0"]
+benchmark = ["matplotlib", "datasets>=3.3.0"]
+test = ["pytest"]
+
+[project.urls]
+Homepage = "https://github.com/fla-org/flash-linear-attention"
+Repository = "https://github.com/fla-org/flash-linear-attention"
+
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["fla"]
+force-sort-within-sections = false
+
+[tool.pytest.ini_options]
+log_cli = true
+log_cli_level = "INFO"
+pythonpath = [
+  "."
+]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 127
+
+[tool.ruff.format]
+docstring-code-format = true
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle
+    "F",    # Pyflakes
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "SIM",  # flake8-simplify
+    "I",    # isort
+    "C4",   # flake8-comprehensions
+    "TCH",  # flake8-type-checking
+    "COM",  # flake8-commas
+    "T",    # flake8-debugger
+]
+ignore = [
+    "E501",
+    "E741",
+    "B023",
+    "B006",
+    "B007",
+    "B008",
+    "B028",
+    "B904",
+    "C408",
+    "C416",
+    "C417",
+    "T201",
+    "TC002",
+    "TC003",
+    "SIM102",
+    "SIM108",
+    "SIM118",
+    "SIM211",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+"fla/utils.py" = ["TCH004"]
+"evals/harness.py" = ["I", "TCH"]
+"tests/*/*.py" = ["UP030"]
+"scripts/*.py" = ["C414"]
+"egacy/training/flame/*.py" = ["C408"]

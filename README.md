@@ -1,161 +1,177 @@
-# SpikingBrain：Spiking Brain-inspired Large Models
-
-📄 Technical Report: [Chinese](SpikingBrain_Report_Chi.pdf) | [English](SpikingBrain_Report_Eng.pdf)  
-🚀 Arxiv: [arXiv:2509.05276](https://www.arxiv.org/abs/2509.05276)  
-🧩 Models: [Available Models](#available-models)   
-🔗 Demo: [OpenBayes贝式计算](https://openbayes.com/console/public/tutorials/eKBhv3jUkWw)    
+# SpikingBrain2.0
 
 ---
 
-## About SpikingBrain
+## About SpikingBrain2.0
 
-Inspired by brain mechanisms, **SpikingBrain** integrates **hybrid efficient attention**, **MoE modules**, and **spike encoding** into its architecture, supported by a universal conversion pipeline compatible with the open-source model ecosystem. This enables continual pre-training with less than 2\% of the data while achieving performance comparable to mainstream open-source models. We further adapt frameworks, operators, parallel strategies, and communication primitives for **non-NVIDIA (MetaX) clusters**, ensuring stable large-scale training and inference. SpikingBrain achieves over 100× speedup in TTFT for 4M-token sequences, while spiking delivers over 69\% sparsity at the micro level. Combined with macro-level MoE sparsity, these advances provide valuable guidance for the design of next-generation neuromorphic chips.
+Building on [SpikingBrain1.0](https://github.com/BICLab/SpikingBrain-7B), **SpikingBrain2.0** marks our next step toward brain-inspired foundation models for long-context intelligence, comprising [SpikingBrain2.0-5B](https://www.modelscope.cn/profile/Panyuqi) for language modeling and [SpikingBrain2.0-VL-5B](https://www.modelscope.cn/models/zhongfangzhi/SpikeBrain-2.0-VL) for vision-language modeling. It adopts an inter-layer hybrid architecture that combines Sparse Softmax Attention ([MoBA](https://github.com/MoonshotAI/MoBA)) with Sparse Linear Attention ([SSE](https://openreview.net/pdf?id=R6DrJ4tnGV)), achieving a stronger balance between modeling capability and computational efficiency while alleviating contextual memory interference in long sequences. To support efficient architecture migration, **SpikingBrain2.0** is further built upon a lightweight Transformer-to-Hybrid conversion pipeline, enabling both LLMs and VLMs to be adapted from open-source Transformer backbones at very low cost. With fewer than 7k A100 GPU hours, it recovers most of the backbone model’s capabilities and delivers competitive performance across general, reasoning, and multimodal benchmarks.
 
-![](assets/fig1.png)
+---
+
+## Available Models 🧩
+The model weights are hosted on **ModelScope**. Please select the appropriate version based on your needs:
+
+- **SpikingBrain-2.0-base-8k :** https://www.modelscope.cn/models/Panyuqi/SpikingBrain-2.0-base-8k
+- **SpikingBrain-2.0-base-64k :** https://www.modelscope.cn/models/Panyuqi/SpikingBrain-2.0-base-64k
+- **SpikingBrain-2.0-base-256k :** https://www.modelscope.cn/models/Panyuqi/SpikingBrain-2.0-base-256k
+- **SpikingBrain-2.0-base-512k :** https://www.modelscope.cn/models/Panyuqi/SpikingBrain-2.0-base-512k
+- **SpikingBrain-2.0-instruct :** https://www.modelscope.cn/models/Panyuqi/SpikingBrain-2.0-instruct
+- **SpikingBrain-2.0-think :** https://www.modelscope.cn/models/Panyuqi/SpikingBrain-2.0-think
+- **SpikingBrain-2.0-VL :** https://www.modelscope.cn/models/zhongfangzhi/SpikeBrain-2.0-VL
 
 ---
 
 ## Project Structure
-This repository provides the full implementation and weights of **SpikingBrain-7B**, including the **HuggingFace version**, **vLLM inference version**, and **quantized version**, enabling flexible deployment and research across different scenarios.
+This repository provides the full implementation **SpikingBrain2.0**, including the **HuggingFace version LLM**, **vLLM inference version LLM**, and the implementation **SpikingBrain2.0-VL**, enabling flexible deployment and research across different scenarios.
 
 ```
-SpikingBrain-7B/
-├── hf_7B_model/ # HuggingFace version
-├── hf_7B_VLM/   # VLM Model HuggingFace version
-├── run_model/   # Model run examples
-├── vllm_hymeta/ # vLLM plugins and inference support
-├── W8ASpike/    # Quantized inference version
-├── setup.py
-├── requirements.txt 
+SpikingBrain2.0/
+├── spb2/ # Hugging Face implementation of SpB2.0 LLM, with configuration files for each stage of training.
+├── spb2_vllm/ # vLLM plugin for SpB2.0 inference
+├── spb2vl/ # Hugging Face implementation of SpB2.0-VL
+├── flash-linear-attention_dev # fla with SSE implementation
+├── MoBA # MoBA adapted to the new FlashAttention interface
 └── README.md 
 ```
 
 --- 
 
-## vLLM-HyMeta
+## Dependency Notes
 
-**vllm-hymeta** is the plugin adaptation of HyMeta (Hybrid Models built on MetaX GPUs) for the [vLLM inference framework](https://github.com/vllm-project/vllm/tree/main), providing efficient inference support on NVIDIA GPUs.
+This repository includes two important local dependency trees:
 
-By leveraging the [plugins mechanism](https://blog.vllm.ai/2025/05/12/hardware-plugin.html) in vLLM, hardware backends can be integrated in a modular fashion, bringing the following benefits:
+### `flash-linear-attention_dev`
 
-- **Decoupled codebase**: Backend-specific code remains independent, keeping the vLLM core cleaner.
+This directory contains a **modified version of flash-linear-attention with added SSE support**. In **SpikingBrain2.0**, the [SSE](https://openreview.net/pdf?id=R6DrJ4tnGV) model is built as a **S**parse **S**tate **E**xpansion over [Gated DeltaNet](https://openreview.net/pdf?id=r8H7xhYPwz). By extending the compressed recurrent memory of GDN into multiple sparsely updated state partitions, **SSE** increases effective memory capacity and enhances long-context retrieval, while largely preserving the efficiency benefits of linear recurrent modeling.
 
-- **Reduced maintenance cost**: vLLM developers can focus on general functionality without being affected by backend-specific implementations.
+### `MoBA`
 
-- **Faster integration**: New backends can be integrated quickly and evolve independently with less engineering effort.
+This directory contains a **MoBA implementation whose interfaces were adapted to the newer FlashAttention API**.
 
-### Container Deployment (NVIDIA)
+- The bundled **`MoBA/` directory mainly serves the Hugging Face side**, including both **`spb2` (LLM)** and **`spb2vl` (VLM)**.
+- The **vLLM side does not use this bundled `MoBA/` implementation**. Instead, **`spb2_vllm` uses the official `flash-moba` package**.
+
+For `spb2_vllm`, the runtime environment additionally requires:
+
+- **`flash_moba==2.0.0`**
+- official repository: `https://github.com/mit-han-lab/flash-moba`
+
+---
+
+## `spb2` (Hugging Face LLM)
+
+### Environment Setup
+
+`spb2` requires the following core versions:
+
+
 ```bash
-git clone https://github.com/BICLab/SpikingBrain-7B.git
-cd SpikingBrain-7B
-docker build -t spiking-brain:7b-v1.0 .
+# create and activate your environment first,
+
+pip install transformers==4.57.1
+pip install triton==3.2.0
+pip install flash-attn==2.7.3
+
+# flash-linear-attention should be installed from the bundled `flash-linear-attention_dev/`
+cd flash-linear-attention_dev
+pip install -e .
+cd ..
+
+# MoBA should be installed from the bundled `MoBA/`
+cd MoBA
+pip install -e .
+cd ..
 ```
+
+---
+
+## `spb2vl` (Hugging Face VLM)
+
+### Environment Setup
+
+`spb2vl` requires the following core versions:
+
+
 ```bash
-docker run -itd \
-    --entrypoint /bin/bash \
-    --network host \
-    --name <container_name> \
-    --shm-size 160g \
-    --gpus all \
-    --privileged \
-    -v /host_path:/container_path \
-    spiking-brain:7b-v1.0
+# create and activate your environment first
+
+pip install transformers==4.57.3
+pip install flash_attn==2.6.3
+
+# flash-linear-attention should be installed from the bundled `flash-linear-attention_dev/`
+cd flash-linear-attention_dev
+pip install -e .
+cd ..
+
+# MoBA should be installed from the bundled `MoBA/`
+cd MoBA
+pip install -e .
+cd ..
 ```
 
-Recommended environment for installing **vllm-hymeta** on NVIDIA GPUs:
+---
 
-```makefile
-torch==2.7.1
-transformers==4.55.2
-triton==3.3.1
-flash_attn==2.7.3
-flash-linear-attention==0.1
-vllm==0.10.0
-scipy
-pyyaml
-decorator
-setuptools
-setuptools-scm
+## `spb2_vllm` (vLLM plugin)
+
+### Environment
+
+`spb2_vllm` requires the following core versions:
+
+
+```bash
+# create and activate your environment first
+
+pip install "torch>=2.9.0"
+pip install "transformers>=4.57.0"
+pip install triton==3.5.0
+pip install flash_attn==2.8.3
+pip install vllm==0.13.0
+pip install setuptools scipy
+
+#  details in https://github.com/mit-han-lab/flash-moba
+git clone https://github.com/mit-han-lab/flash-moba
+cd flash-moba
+MAX_JOBS=32 python setup.py install
+cd ..
+
+# flash-linear-attention should be installed from the bundled `flash-linear-attention_dev/`
+cd flash-linear-attention_dev
+pip install -e .
+cd ..
+
+cd spb2_vllm
+pip install -e .
+cd ..
 ```
 
-### Run with vLLM
+### Usage
 
-You can serve a model with vLLM in the simplest way using the following command:
+After installing the plugin, you can launch SpB2.0 with vLLM. A typical command is:
+
 
 ```bash
 vllm serve <your_model_path> \
   --served-model-name <model_name> \
-  --gpu-memory-utilization <ratio> \
-  --block-size <size> \
+  --max-model-len 524288 \
+  --no-enable-chunked-prefill \
+  --no-enable-prefix-caching \
+  --gpu-memory-utilization 0.6 \
+  --tensor-parallel-size 8 \
+  --block-size 128 \
   --dtype bfloat16 \
-  --port <port_number>
+  --trust-remote-code \
+  --port 8000 \
+  --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY"}'
 ```
 
-You may also set `--tensor-parallel-size` and `--pipeline-parallel-size` when launching if you want to run with multiple GPUs. 
-
----
-
-## W8ASpike
-
-**W8ASpike** is the quantized inference version of SpikingBrain-7B, aiming to reduce inference cost under low-precision settings and explore the potential of Spiking Neural Networks (SNNs).
-
-The current implementation adopts **pseudo-spiking**, where activations are approximated as spike-like signals at the tensor level, rather than true asynchronous event-driven spiking on neuromorphic hardware.
-
-- **Pseudo-spiking**: Efficient approximation at the tensor level, suitable for prototyping and research.
-
-- **True-spiking**: Requires asynchronous hardware and event-driven operator support, which is beyond the scope of this repository.
-
-The activation spike encoding process here is inspired by the pseudo-spiking interfaces from [BICLab/Int2Spike](https://github.com/BICLab/Int2Spike). For additional PyTorch-based spiking interfaces, please refer to the Int2Spike library.
-
----
-
-## Available Models
-The model weights are hosted on **ModelScope**. Please select the appropriate version based on your needs:
-
-- **Pre-trained model (7B):** https://www.modelscope.cn/models/Panyuqi/V1-7B-base
-- **Chat model (7B-SFT):** https://www.modelscope.cn/models/Panyuqi/V1-7B-sft-s3-reasoning
-- **Vision-language model (7B-SFT):** https://www.modelscope.cn/models/sherry12334/SpikingBrain-7B-VL
-- **Quantized weights (7B-W8ASpike):** https://www.modelscope.cn/models/Abel2076/SpikingBrain-7B-W8ASpike
-
-### Usage
-Example scripts are provided in [`run_model/`](run_model) for running the model with the released checkpoints. 
-
-- **Hugging Face**  
-Load with `AutoModelForCausalLM` and use as a standard CausalLM (forward or generation); see [`run_model/run_model_hf.py`](run_model/run_model_hf.py).  
-For the SFT model, a chat template is used; see [`run_model/run_model_hf_chat_template.py`](run_model/run_model_hf_chat_template.py).
-
-- **vLLM**  
-Perform inference using the provided **vLLM Hymeta** plugin; see [`run_model/run_model_vllm.py`](run_model/run_model_vllm.py) and the [vLLM Hymeta](#vllm-hymeta) section.   
 Please make sure to remove the `auto_map` field from `config.json`. Specifically, delete the following block if it is present:
+
 ```json
 "auto_map": {
-  "AutoConfig": "configuration_gla_swa.GLAswaConfig",
-  "AutoModelForCausalLM": "modeling_gla_swa.GLAswaForCausalLM"
+  "AutoConfig": "configuration_sse_swa_moba.SSESWAMoBAConfig",
+  "AutoModelForCausalLM": "modeling_sse_swa_moba.SSESWAMoBAForCausalLM"
 }
 ```
 
-> For tested environment, please refer to [requirements.txt](requirements.txt).
+---
 
-### Performance Evaluation
-Table 1: **Performance evaluation of the SpikingBrain-7B pre-trained model.** All models are tested with the HuggingFace framework and evaluated using a perplexity-based method. Except for Qwen2.5, the other baselines are trained on limited Chinese data, resulting in clear disadvantages on CMMLU and C-Eval.
-![](assets/table1.png)
-
-
-Table 2: **Performance evaluation of the SpikingBrain-76B pre-trained model.** All models are tested with the vLLM framework and evaluated using a perplexity-based method. Except for Qwen2.5, the other baselines are trained on limited Chinese data, resulting in clear disadvantages on CMMLU and C-Eval.
-![](assets/table2.png)
-
---- 
-
-## Citation
-
-If you find our work useful, please consider citing **SpikingBrain**:
-
-```bibtex
-@article{pan2025spikingbrain,
-  title={SpikingBrain Technical Report: Spiking Brain-inspired Large Models},
-  author={Pan, Yuqi and Feng, Yupeng and Zhuang, Jinghao and Ding, Siyu and Liu, Zehao and Sun, Bohan and Chou, Yuhong and Xu, Han and Qiu, Xuerui and Deng, Anlin and others},
-  journal={arXiv preprint arXiv:2509.05276},
-  year={2025}
-}
-
-```
