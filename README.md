@@ -1,4 +1,4 @@
-# SpikingBrain2.0
+# SpikingBrain2.0：Spiking Brain-inspired Large Models
 
 📄 Technical Report: [English](SpikingBrain_Report_Eng.pdf)  
 🚀 Arxiv: [arXiv:2509.05276](https://www.arxiv.org/abs/2509.05276)  
@@ -64,7 +64,7 @@ flash-linear-attention_dev  # use the local version in this repo
 MoBA                        # use the local version in this repo
 ```
 
-### `Hugging Face VLM(spb2)
+### Hugging Face VLM (spb2)
 
 #### Setup suggestion
 
@@ -75,7 +75,7 @@ flash-linear-attention_dev  # use the local version in this repo
 MoBA                        # use the local version in this repo
 ```
 
-### vLLM inference plugin for both LLM and VLM(spb2_vllm)
+### vLLM inference plugin (spb2_vllm)
 
 #### Setup suggestion
 
