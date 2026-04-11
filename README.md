@@ -26,13 +26,13 @@ SpikingBrain2.0/
 
 This repository includes two important local dependency trees.
 
-### `flash-linear-attention_dev`
+---
 
 `flash-linear-attention_dev/` contains a modified version of flash-linear-attention with added SSE support.
 
 In SpikingBrain2.0, [SSE](https://openreview.net/pdf?id=R6DrJ4tnGV) is built as a **Sparse State Expansion** mechanism over [Gated DeltaNet](https://openreview.net/pdf?id=r8H7xhYPwz). By extending the compressed recurrent memory of Gated DeltaNet into multiple sparsely updated state partitions, SSE improves effective memory capacity and long-context retrieval while largely preserving the efficiency benefits of recurrent linear modeling.
 
-### `MoBA`
+---
 
 `MoBA/` contains a customized MoBA implementation whose interfaces were adapted to the newer FlashAttention API used by this repository.
 
