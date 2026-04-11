@@ -98,10 +98,10 @@ def sse_fused_recurrent_gated_delta_rule_fwd_kernel(
 
     mask_k = o_k < K
     mask_v = o_v < V
-    mask_h = mask_k[:, None] & mask_v[None, :] # mask_k[:, None] is [BK, 1], mask_v[None, :] is [1, BV]
+    mask_h = mask_v[:, None] & mask_k[None, :] # mask_v[:, None] is [BV, 1], mask_k[None, :] is [1, BK]
     # mask_h = 1 only when both key and value indices are valid
 
-    b_h = tl.zeros([BK, BV], dtype=tl.float32)
+    b_h = tl.zeros([BV, BK], dtype=tl.float32)
     if IS_SSE:
         i_ex = tl.load(ssm_state_expert_indices + i_n).to(tl.int64) # ssm_state_expert_indices[i_n] indicate the expert index for sequence i_n
     else:
@@ -113,21 +113,21 @@ def sse_fused_recurrent_gated_delta_rule_fwd_kernel(
                 i_t = tl.load(num_accepted_tokens + i_n).to(tl.int64) - 1 # num_accepted_tokens[i_n] is number of accepted tokens for sequence i_n, so the index of the current token is num_accepted_tokens[i_n] - 1
             else:
                 i_t = 0 # 没有 spec decoding 时，即每次只接受一个新 token，初始状态对应第 0 个 token
-            
+            state_idx = tl.load(ssm_state_indices + i_n * stride_indices_seq + i_t).to(tl.int64)
+            # Skip if state index is invalid (PAD_SLOT_ID = -1)
+            if state_idx < 0:
+                return
             # 加上 slot 和 expert 的偏移
             p_h0 = (
                 h0
-                + tl.load(ssm_state_indices + i_n * stride_indices_seq + i_t).to( # ssm_state_indices[i_n, i_t] indicate the slot index
-                    tl.int64
-                )
-                * stride_init_state_token
+                + state_idx * stride_init_state_token
                 + i_ex * stride_init_state_expert
             ) 
         else: # don't have ssm_state_indices, 默认按照 token-level 一一对应
-            p_h0 = h0 + bos * num_partitions * HV * K * V + i_ex * stride_init_state_expert
+            p_h0 = h0 + bos * num_partitions * HV * V * K + i_ex * stride_init_state_expert
         # shape [, expert, HV, K, V]
         # 加上 head v, key and value 的偏移
-        p_h0 = p_h0 + i_hv * K * V + o_k[:, None] * V + o_v[None, :]
+        p_h0 = p_h0 + i_hv * V * K + o_v[:, None] * K + o_k[None, :]
         b_h += tl.load(p_h0, mask=mask_h, other=0).to(tl.float32)
 
     for i_t in range(0, T):
@@ -145,36 +145,40 @@ def sse_fused_recurrent_gated_delta_rule_fwd_kernel(
             b_h *= exp(b_g)
         else:
             b_gk = tl.load(p_gk).to(tl.float32)
-            b_h *= exp(b_gk[:, None])
+            b_h *= exp(b_gk[None, :])
         # [BV]
-        b_v -= tl.sum(b_h * b_k[:, None], 0)
+        b_v -= tl.sum(b_h * b_k[None, :], 1)
         if IS_BETA_HEADWISE:
             b_beta = tl.load(p_beta, mask=mask_v, other=0).to(tl.float32)
         else:
             b_beta = tl.load(p_beta).to(tl.float32)
         b_v *= b_beta
-        # [BK, BV]
-        b_h += b_k[:, None] * b_v[None, :]
+        # [BV, BK]
+        b_h += b_v[:, None] * b_k[None, :]
         # [BV]
-        b_o = tl.sum(b_h * b_q[:, None], 0)
+        b_o = tl.sum(b_h * b_q[None, :], 1)
         tl.store(p_o, b_o.to(p_o.dtype.element_ty), mask=mask_v)
 
         # keep the states for multi-query tokens
         # 计算 slot 和 expert 的偏移
         if INPLACE_FINAL_STATE:
-            p_ht = (
-                ht
-                + tl.load(ssm_state_indices + i_n * stride_indices_seq + i_t).to(
-                    tl.int64
+            final_state_idx = tl.load(
+                ssm_state_indices + i_n * stride_indices_seq + i_t
+            ).to(tl.int64)
+            # Only store if the state index is valid (not PAD_SLOT_ID = -1)
+            if final_state_idx >= 0:
+                p_ht = (
+                    ht
+                    + final_state_idx * stride_final_state_token
+                    + i_ex * stride_final_state_expert
                 )
-                * stride_final_state_token
-                + i_ex * stride_final_state_expert
-            )
+                p_ht = p_ht + i_hv * V * K + o_v[:, None] * K + o_k[None, :]
+                tl.store(p_ht, b_h.to(p_ht.dtype.element_ty), mask=mask_h)
         else:
             p_ht = ht + (bos + i_t) * stride_final_state_token + i_ex * stride_final_state_expert
-        # 计算 head v, key and value 的偏移
-        p_ht = p_ht + i_hv * K * V + o_k[:, None] * V + o_v[None, :]
-        tl.store(p_ht, b_h.to(p_ht.dtype.element_ty), mask=mask_h)
+            # 计算 head v, key and value 的偏移
+            p_ht = p_ht + i_hv * V * K + o_v[:, None] * K + o_k[None, :]
+            tl.store(p_ht, b_h.to(p_ht.dtype.element_ty), mask=mask_h)
 
         p_q += H * K
         p_k += H * K
@@ -206,7 +210,7 @@ def sse_fused_recurrent_gated_delta_rule_fwd(
     B, T, H, K, V = *k.shape, v.shape[-1]
     HV = v.shape[2] # head v
     N = B if cu_seqlens is None else len(cu_seqlens) - 1
-    BK, BV = triton.next_power_of_2(K), min(triton.next_power_of_2(V), 8)
+    BK, BV = triton.next_power_of_2(K), min(triton.next_power_of_2(V), 32)
     NK, NV = triton.cdiv(K, BK), triton.cdiv(V, BV)
     assert NK == 1, "NK > 1 is not supported yet"
     num_stages = 3
@@ -216,7 +220,7 @@ def sse_fused_recurrent_gated_delta_rule_fwd(
     if inplace_final_state: # store final state in-place
         final_state = initial_state
     else: # store all the states for each token
-        final_state = q.new_empty(T, num_partitions, HV, K, V, dtype=initial_state.dtype)
+        final_state = q.new_empty(T, num_partitions, HV, V, K, dtype=initial_state.dtype)
 
     stride_init_state_token = initial_state.stride(0) # stride to jump to next slot in initial state
     stride_init_state_expert = initial_state.stride(1) # stride to jump to next expert in initial state

@@ -8,7 +8,7 @@ from vllm.config.cache import MambaDType
 from vllm.config.model import ModelDType
 from vllm.utils.torch_utils import get_kv_cache_torch_dtype
 
-from vllm.attention.backends.abstract import AttentionMetadata
+from vllm.v1.attention.backend import AttentionMetadata
 from vllm.config import CacheConfig, ModelConfig, get_current_vllm_config
 from vllm.distributed import (
     divide,
@@ -21,6 +21,7 @@ from vllm.model_executor.model_loader.weight_utils import sharded_weight_loader
 from vllm.model_executor.utils import set_weight_attrs
 from vllm.utils.torch_utils import direct_register_custom_op
 from vllm.v1.attention.backends.gdn_attn import GDNAttentionMetadata
+from vllm.v1.attention.backends.utils import PAD_SLOT_ID
 
 from vllm.model_executor.layers.linear import (
     ColumnParallelLinear, 
@@ -30,6 +31,10 @@ from vllm.model_executor.layers.linear import (
     MergedColumnParallelLinear,
 )
 from vllm.model_executor.layers.mamba.abstract import MambaBase
+from vllm.model_executor.layers.mamba.mamba_utils import (
+    get_conv_copy_spec,
+    get_temporal_copy_spec
+)
 # from vllm.model_executor.layers.mamba.mamba_utils import MambaStateDtypeCalculator, MambaStateShapeCalculator
 from vllm.model_executor.layers.mamba.ops.causal_conv1d import causal_conv1d_fn, causal_conv1d_update
 from vllm.model_executor.layers.quantization.base_config import QuantizationConfig
@@ -45,12 +50,17 @@ from vllm.model_executor.layers.fla.ops import chunk_gated_delta_rule, fused_rec
 from fla.ops.sse import prepare_sample_relpos_global_index_flat
 from .ops.fused_recurrent import sse_fused_recurrent_gated_delta_rule
 
-from vllm.attention.layer import Attention
+from vllm.model_executor.layers.attention import Attention
 # from fla.modules import FusedRMSNormGated, RMSNorm
 from vllm.model_executor.layers.layernorm import RMSNorm
 from vllm.model_executor.layers.fla.ops.kda import FusedRMSNormGated
 # from vllm.model_executor.layers.rotary_embedding.base import RotaryEmbedding
 from vllm.model_executor.layers.rotary_embedding import get_rope
+
+from vllm.model_executor.layers.mamba.mamba_utils import (
+    MambaStateCopyFunc,
+    MambaStateCopyFuncCalculator
+)
 
 logger = init_logger(__name__)
 
@@ -165,7 +175,7 @@ direct_register_custom_op(
     op_func=sse_swa_gdn_h_func,
     mutates_args=["core_attn_out"],
     fake_impl=sse_swa_gdn_h_func_fake,
-    # tags=(torch.Tag.cudagraph_unsafe,),
+    tags=(torch.Tag.cudagraph_unsafe,),
 )
 
         
@@ -176,7 +186,7 @@ class SSE_GDN_H(nn.Module, MambaBase):
     
     def get_state_dtype(
         self,
-    ) -> tuple[torch.dtype, torch.dtype, torch.dtype]:
+    ) -> tuple[torch.dtype, torch.dtype, torch.dtype] | tuple[torch.dtype]:
         if self.model_config is None or self.cache_config is None:
             raise ValueError("ModelConfig and CacheConfig must be set.")
         return SSE_GDN_H.SSE_GDN_H_state_dtype(
@@ -185,7 +195,7 @@ class SSE_GDN_H(nn.Module, MambaBase):
 
     def get_state_shape(
         self,
-    ) -> tuple[tuple[int, ...], tuple[int, ...], tuple[int, ...]]:
+    ) -> tuple[tuple[int, ...], tuple[int, ...], tuple[int, ...]] | tuple[tuple[int, ...]]:
         # return MambaStateShapeCalculator.gdn_attention_state_shape(
         #     self.tp_size, self.num_heads, self.head_dim
         # )
@@ -194,11 +204,11 @@ class SSE_GDN_H(nn.Module, MambaBase):
             conv_state_shape = (self.tp_heads, self.conv_size - 1)
         
         num_partition = 1 + self.num_sparse_partition
-        recurrent_state_shape = (num_partition, self.sse_tp_kv_heads, self.sse_head_k_dim, self.sse_head_v_dim)
+        recurrent_state_shape = (num_partition, self.sse_tp_kv_heads, self.sse_head_v_dim, self.sse_head_k_dim)
         if self.use_short_conv:
             return (conv_state_shape, conv_state_shape, recurrent_state_shape)
         else:
-            return ((), (), recurrent_state_shape)
+            return (recurrent_state_shape, )
 
     @classmethod
     def SSE_GDN_H_state_dtype(
@@ -206,12 +216,16 @@ class SSE_GDN_H(nn.Module, MambaBase):
         model_dtype: ModelDType | torch.dtype,
         mamba_cache_dtype: MambaDType,
         mamba_ssm_cache_dtype: MambaDType = "auto",
-    ):
+        use_short_conv: bool = False,
+    ) -> tuple[torch.dtype, torch.dtype, torch.dtype] | tuple[torch.dtype]:
         state_dtype = get_kv_cache_torch_dtype(mamba_cache_dtype, model_dtype)
         ssm_dtype = torch.float32 if mamba_ssm_cache_dtype == "auto" \
             else get_kv_cache_torch_dtype(mamba_ssm_cache_dtype, model_dtype)
         # logger.info(f"SSE_SWA {state_dtype=}, {ssm_dtype=}")
-        return (state_dtype, state_dtype, ssm_dtype)
+        if use_short_conv:
+            return (state_dtype, state_dtype, ssm_dtype)
+        else:
+            return (ssm_dtype, )
 
     @classmethod
     def SSE_GDN_H_state_shape(
@@ -224,18 +238,34 @@ class SSE_GDN_H(nn.Module, MambaBase):
         use_short_conv: bool = False,
         conv_kernel_size: int = 4,
         sparse_partition: int = 0,
-    ) -> tuple[tuple[int, ...], tuple[int, ...], tuple[int, ...]]:
+    ) -> tuple[tuple[int, ...], tuple[int, ...], tuple[int, ...]] | tuple[tuple[int, ...]]:
         conv_state_shape = (0, 0)
         if use_short_conv:
             conv_state_shape = (num_heads // tp_world_size, conv_kernel_size - 1)
         
         num_partition = 1 + sparse_partition
-        recurrent_state_shape = (num_partition, num_v_heads // tp_world_size, head_k_dim, head_v_dim)
+        recurrent_state_shape = (num_partition, num_v_heads // tp_world_size, head_v_dim, head_k_dim)
         if use_short_conv:
             return (conv_state_shape, conv_state_shape, recurrent_state_shape)
         else:
-            return ((), (), recurrent_state_shape)
-
+            return (recurrent_state_shape, )
+    
+    @classmethod
+    def get_SSE_GDN_H_state_copy_func(
+        cls,
+        use_short_conv: bool = False,
+    ) -> tuple[MambaStateCopyFunc, MambaStateCopyFunc, MambaStateCopyFunc] | tuple[MambaStateCopyFunc]:
+        if use_short_conv:
+            return (
+                get_conv_copy_spec,
+                get_conv_copy_spec,
+                get_temporal_copy_spec,
+            )
+        else:
+            return (
+                get_temporal_copy_spec,
+            )
+        
     """
     为 channel-major 布局的参数 (如 A_log, dt_bias) 创建自定义 loader
     假设原始权重形状: [2 * total_heads] (布局: [a1_all_heads, a2_all_heads])
@@ -389,10 +419,10 @@ class SSE_GDN_H(nn.Module, MambaBase):
             )
         assert mode in ['chunk', 'fused_recurrent'], f"Not supported mode `{mode}`."
 
-        self.sse_qkv_proj = MergedColumnParallelLinear(
+        self.qkv_proj = MergedColumnParallelLinear(
             hidden_size, [self.sse_key_dim] * 2 + [self.sse_value_dim], bias=False,
             quant_config=quant_config,
-            prefix=f"{prefix}.sse_qkv_proj",
+            prefix=f"{prefix}.qkv_proj",
         )
 
         self.lora_q_proj_A = ReplicatedLinear(
@@ -503,7 +533,7 @@ class SSE_GDN_H(nn.Module, MambaBase):
         # sse_q1, _ = self.sse_q_proj(hidden_states)
         # sse_k1, _ = self.sse_k_proj(hidden_states)
         # sse_v, _ = self.sse_v_proj(hidden_states)
-        sse_qkv, _ = self.sse_qkv_proj(hidden_states)
+        sse_qkv, _ = self.qkv_proj(hidden_states)
         sse_q1, sse_k1, sse_v = torch.split(sse_qkv, [self.sse_tp_k_dim, self.sse_tp_k_dim, self.sse_tp_v_dim], dim=-1)
 
         sse_q2 = sse_q1 + self.lora_q_proj_B(self.lora_q_proj_A(hidden_states)[0])[0] # [0] because Linear returns output and bias
@@ -577,7 +607,11 @@ class SSE_GDN_H(nn.Module, MambaBase):
         num_actual_tokens = attn_metadata.num_actual_tokens
         constant_caches = self.kv_cache[forward_context.virtual_engine]
 
-        (conv_state_q, conv_state_k, recurrent_state) = constant_caches
+        if self.use_short_conv:
+            (conv_state_q, conv_state_k, recurrent_state) = constant_caches
+        else:
+            recurrent_state, = constant_caches
+        
         if self.use_short_conv:
             conv_state_q = conv_state_q.transpose(-1, -2)
             conv_state_k = conv_state_k.transpose(-1, -2)
@@ -805,9 +839,8 @@ class SSE_GDN_H(nn.Module, MambaBase):
             if has_initial_state is not None:
                 # zero_idx 表示没有初始 state 的那些序列在 non_spec_state_indices_tensor 中的位置
                 zero_idx = non_spec_state_indices_tensor[~has_initial_state]
+                zero_idx = zero_idx[zero_idx != PAD_SLOT_ID]
                 recurrent_state[zero_idx] = 0
-                # print(f"{has_initial_state=}, {zero_idx=}, {active_seq_slots=}")
-                # print("initial_state shape:", recurrent_state.shape) # torch.Size([3062, 5, 8, 128, 128])
             initial_state = recurrent_state[active_seq_slots, active_partition_ids].contiguous()
             (
                 core_attn_out_non_spec,
@@ -822,14 +855,11 @@ class SSE_GDN_H(nn.Module, MambaBase):
                 initial_state = initial_state,
                 output_final_state = True,
                 cu_seqlens = new_cu_seqlens,
-                head_first = False,
                 use_qk_l2norm_in_kernel = True,
             )
             # chk("fla_o", o, self.prefix, show=True)
             # chk("fla_recurrent_state_rec", recurrent_state_rec, self.prefix, show=True)
-            recurrent_state[active_seq_slots, active_partition_ids] = last_recurrent_state.to( # both float32
-                dtype=recurrent_state.dtype,
-            )
+            recurrent_state[active_seq_slots, active_partition_ids] = last_recurrent_state.to(recurrent_state.dtype)
             # assert torch.allclose(recurrent_state[active_seq_slots, active_partition_ids], last_recurrent_state.to(
             #     dtype=recurrent_state.dtype,
             #     device=recurrent_state.device,
@@ -892,7 +922,7 @@ class SlidingWindowAttention(nn.Module):
         swa_dropout: float = 0.5,
         window_size: int | None = None,
         rope_theta: float | None = 10000.,
-        rope_scaling: float | None = None,
+        rope_scaling: dict | float | None = None,
         max_position_embeddings: int | None = None,
         rms_norm_eps: float = 1e-5,
         prefix: str = "",
@@ -932,14 +962,14 @@ class SlidingWindowAttention(nn.Module):
         self.qk_norm = swa_qk_norm
         self.max_position_embeddings = max_position_embeddings
 
-        self.swa_qkv_proj = QKVParallelLinear(
+        self.qkv_proj = QKVParallelLinear(
             hidden_size=hidden_size,
             head_size=self.head_dim,
             total_num_heads=self.total_num_heads,
             total_num_kv_heads=self.total_num_kv_heads,
             bias=qkv_bias,
             quant_config=quant_config,
-            prefix=f"{prefix}.swa_qkv_proj",
+            prefix=f"{prefix}.qkv_proj",
         )
 
         if self.qk_norm:
@@ -954,10 +984,16 @@ class SlidingWindowAttention(nn.Module):
         #     is_neox_style=True,
         #     dtype=torch.float32,
         # )
-        rope_parameters = dict()
-        rope_parameters['rope_theta'] = rope_theta
+        rope_parameters = {"rope_theta": rope_theta}
         if rope_scaling is not None:
-            rope_parameters['factor'] = rope_scaling
+            if isinstance(rope_scaling, dict):
+                # vLLM get_rope follows HF's rope_type-based config shape.
+                rope_parameters.update(rope_scaling)
+                if "type" in rope_parameters and "rope_type" not in rope_parameters:
+                    rope_parameters["rope_type"] = rope_parameters.pop("type")
+            else:
+                # Backward-compatible path for legacy float scaling configs.
+                rope_parameters["factor"] = rope_scaling
         self.rotary = get_rope(
             self.head_dim,
             max_position=self.max_position_embeddings,
@@ -989,7 +1025,7 @@ class SlidingWindowAttention(nn.Module):
         positions: torch.Tensor,
         output: torch.Tensor,
     ):
-        qkv, _ = self.swa_qkv_proj(hidden_states)
+        qkv, _ = self.qkv_proj(hidden_states)
         swa_q, swa_k, swa_v = qkv.split([self.q_size, self.kv_size, self.kv_size], dim=-1)
         if self.qk_norm:
             # swa_q, swa_k = self.swa_q_norm(swa_q), self.swa_k_norm(swa_k)
@@ -1045,7 +1081,7 @@ class SSE_SWA_Hybrid(nn.Module):
         swa_dropout: float = 0.5,
         window_size: int | None = None,
         rope_theta: float | None = 10000.,
-        rope_scaling: float | None = None,
+        rope_scaling: dict | float | None = None,
         max_position_embeddings: int | None = None,
         # ===================
         rms_norm_eps: float = 1e-5,

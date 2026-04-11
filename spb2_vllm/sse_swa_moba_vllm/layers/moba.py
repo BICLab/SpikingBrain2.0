@@ -28,30 +28,35 @@ from vllm.model_executor.layers.linear import (
     MergedColumnParallelLinear,
 )
 # from fla.modules import RMSNorm
+from vllm.model_executor.layers.attention.attention import (
+    unified_attention_with_output,
+    unified_attention,
+    unified_kv_cache_update,
+    should_load_quant_weights,
+    set_default_quant_scales
+)
 from vllm.model_executor.layers.layernorm import RMSNorm
-from vllm.attention.backends.registry import AttentionBackendEnum
+from vllm.v1.attention.backends.registry import AttentionBackendEnum
 from vllm.model_executor.layers.attention_layer_base import AttentionLayerBase
 from vllm.model_executor.layers.batch_invariant import vllm_is_batch_invariant
 # from vllm.model_executor.layers.rotary_embedding.base import RotaryEmbedding
 from vllm.model_executor.layers.rotary_embedding import get_rope
 
 # from vllm.attention.layers.mm_encoder_attention import maybe_get_vit_flash_attn_backend
-from vllm.attention.selector import get_attn_backend
+from vllm.v1.attention.selector import get_attn_backend
 # from vllm.attention.utils.fa_utils import get_flash_attn_version
-from vllm.attention.utils.kv_sharing_utils import validate_kv_sharing_target
 # from vllm.attention.utils.kv_transfer_utils import maybe_transfer_kv_layer
 
 from vllm.platforms import current_platform
-from vllm.attention.backends.abstract import (
-    AttentionBackend,
-    AttentionType,
-)
+from vllm.v1.attention.backend import AttentionBackend, AttentionType
+
 from vllm.utils.torch_utils import (
     direct_register_custom_op,
     kv_cache_dtype_str_to_dtype,
 )
-from vllm.attention.layer import (
+from vllm.model_executor.layers.attention.attention import (
     _init_kv_cache_quant,
+    validate_kv_sharing_target,
     get_attention_context,
 )
 from vllm.v1.kv_cache_interface import (
@@ -89,6 +94,7 @@ class MixtureOfBlocksAttention(nn.Module, AttentionLayerBase):
         scale: float,
         num_kv_heads: int | None = None,
         alibi_slopes: list[float] | None = None,
+        use_alibi_sqrt: bool | None = None,
         cache_config: CacheConfig | None = None,
         quant_config: QuantizationConfig | None = None,
         logits_soft_cap: float | None = None,
@@ -126,20 +132,34 @@ class MixtureOfBlocksAttention(nn.Module, AttentionLayerBase):
             kv_cache_dtype = "auto"
             block_size = 16
             calculate_kv_scales = False
+        # llm-compressor mdls need to set cache_dtype to "fp8" manually.
+        kv_cache_scheme = getattr(quant_config, "kv_cache_scheme", None)
+        if kv_cache_scheme is not None:
+            kv_cache_dtype = "fp8"
+            calculate_kv_scales = False
+            if cache_config is not None:
+                cache_config.cache_dtype = "fp8"
+                cache_config.calculate_kv_scales = False
+        
+        # Check if per-head quant scales are required based on kv_cache_scheme
+        use_per_head_quant_scales = (
+            kv_cache_scheme is not None
+            and kv_cache_scheme.get("strategy") == "attn_head"
+        )
+
         self.kv_cache_torch_dtype = kv_cache_dtype_str_to_dtype(
             kv_cache_dtype, vllm_config.model_config
         )
+        self.kv_cache_dtype = kv_cache_dtype
+        self.calculate_kv_scales = calculate_kv_scales
         if num_kv_heads is None:
             num_kv_heads = num_heads
         assert num_heads % num_kv_heads == 0, (
             f"num_heads ({num_heads}) is not divisible by num_kv_heads ({num_kv_heads})"
         )
-
-        # Initialize KV cache quantization attributes
-        _init_kv_cache_quant(
-            self, quant_config, prefix, kv_cache_dtype, calculate_kv_scales
-        )
-
+        self.layer_name = prefix
+        self.quant_config = quant_config
+        
         self.num_heads = num_heads
         self.head_size = head_size
         self.num_kv_heads = num_kv_heads
@@ -169,7 +189,16 @@ class MixtureOfBlocksAttention(nn.Module, AttentionLayerBase):
             )
         else:
             self.attn_backend = attn_backend
-
+        backend_supports_alibi_sqrt = self.attn_backend.supports_alibi_sqrt()
+        use_alibi_sqrt = use_alibi_sqrt if use_alibi_sqrt else False
+        if use_alibi_sqrt and not backend_supports_alibi_sqrt:
+            raise ValueError(
+                f"use_alibi_sqrt is not supported by backend "
+                f"{self.attn_backend.get_name()}."
+            )
+        self.use_alibi_sqrt = bool(use_alibi_sqrt)
+        if backend_supports_alibi_sqrt:
+            extra_impl_args["use_alibi_sqrt"] = self.use_alibi_sqrt
         # prefix caching + batch invariance is currently not supported for
         # FLASHINFER and TRITON_MLA.
         if (
@@ -232,7 +261,7 @@ class MixtureOfBlocksAttention(nn.Module, AttentionLayerBase):
         if prefix in compilation_config.static_forward_context:
             raise ValueError(f"Duplicate layer name: {prefix}")
         compilation_config.static_forward_context[prefix] = self
-        self.layer_name = prefix
+        
         self.attn_type = attn_type
 
         if kv_sharing_target_layer_name is not None:
@@ -251,18 +280,24 @@ class MixtureOfBlocksAttention(nn.Module, AttentionLayerBase):
             for _ in range(vllm_config.parallel_config.pipeline_parallel_size)
         ]
 
-        # Initialize q/k/v range constants.
-        self.q_range = torch.tensor(envs.Q_SCALE_CONSTANT, dtype=torch.float32)
-        self.k_range = torch.tensor(envs.K_SCALE_CONSTANT, dtype=torch.float32)
-        self.v_range = torch.tensor(envs.V_SCALE_CONSTANT, dtype=torch.float32)
+        # Initialize KV cache quantization attributes
+        _init_kv_cache_quant(self, quant_config, prefix)
 
         # for attn backends supporting query quantization
         self.query_quant = None
-        if (
-            self.kv_cache_dtype.startswith("fp8")
-            and self.impl.supports_quant_query_input
+        if self.impl.supports_quant_query_input and self.kv_cache_dtype.startswith(
+            "fp8"
         ):
-            self.query_quant = QuantFP8(static=True, group_shape=GroupShape.PER_TENSOR)
+            is_per_head = (
+                hasattr(self, "q_scale") and self.q_scale.numel() == self.num_kv_heads
+            )
+            block_size = self.head_size * self.num_heads // self.num_kv_heads
+            self.query_quant = QuantFP8(
+                static=True,
+                group_shape=GroupShape(-1, block_size)
+                if is_per_head
+                else GroupShape.PER_TENSOR,
+            )
 
     def forward(
         self,
@@ -302,30 +337,53 @@ class MixtureOfBlocksAttention(nn.Module, AttentionLayerBase):
                 key = key.view(-1, self.num_kv_heads, self.head_size)
             if value is not None:
                 value = value.view(-1, self.num_kv_heads, self.head_size)
+            
+            kv_cache_dummy_dep = None
             if self.use_direct_call:
-                forward_context: ForwardContext = get_forward_context()
-                attn_metadata = forward_context.attn_metadata
-                if isinstance(attn_metadata, dict):
-                    attn_metadata = attn_metadata[self.layer_name]
-                self_kv_cache = self.kv_cache[forward_context.virtual_engine]
-                self.impl.forward(
-                    self, query, key, value, self_kv_cache, attn_metadata, output=output
+                # Skip this if sharing KV cache with an earlier attention layer.
+                if (
+                    not self.attn_backend.forward_includes_kv_cache_update
+                    and self.kv_sharing_target_layer_name is None
+                    and key is not None
+                    and value is not None
+                ):
+                    kv_cache_dummy_dep = unified_kv_cache_update(
+                        key, value, self.layer_name
+                    )
+                unified_attention_with_output(
+                    query,
+                    key,
+                    value,
+                    output,
+                    self.layer_name,
+                    kv_cache_dummy_dep=kv_cache_dummy_dep,
                 )
             else:
+                # Skip this if sharing KV cache with an earlier attention layer.
+                if (
+                    not self.attn_backend.forward_includes_kv_cache_update
+                    and self.kv_sharing_target_layer_name is None
+                    and key is not None
+                    and value is not None
+                ):
+                    kv_cache_dummy_dep = torch.ops.vllm.unified_kv_cache_update(
+                        key, value, self.layer_name
+                    )
                 torch.ops.vllm.unified_attention_with_output(
-                    query, key, value, output, self.layer_name
+                    query,
+                    key,
+                    value,
+                    output,
+                    self.layer_name,
+                    kv_cache_dummy_dep=kv_cache_dummy_dep,
                 )
             return output.view(-1, hidden_size)
         else:
+            assert self.attn_backend.forward_includes_kv_cache_update, (
+                "Split KV cache update not supported when output tensor not provided."
+            )
             if self.use_direct_call:
-                forward_context: ForwardContext = get_forward_context()
-                attn_metadata = forward_context.attn_metadata
-                if isinstance(attn_metadata, dict):
-                    attn_metadata = attn_metadata[self.layer_name]
-                self_kv_cache = self.kv_cache[forward_context.virtual_engine]
-                return self.impl.forward(
-                    self, query, key, value, self_kv_cache, attn_metadata
-                )
+                return unified_attention(query, key, value, self.layer_name)
             else:
                 return torch.ops.vllm.unified_attention(
                     query, key, value, self.layer_name
@@ -351,6 +409,14 @@ class MixtureOfBlocksAttention(nn.Module, AttentionLayerBase):
 
     def process_weights_after_loading(self, act_dtype: torch.dtype):
         self.impl.process_weights_after_loading(act_dtype)
+
+        quant_method = (
+            self.quant_config.get_quant_method(self, prefix=self.layer_name)
+            if self.quant_config
+            else None
+        )
+        if not should_load_quant_weights(quant_method):
+            set_default_quant_scales(self, register_buffer=False)
 
     def get_attn_backend(self) -> type[AttentionBackend]:
         return self.attn_backend
@@ -379,8 +445,6 @@ class MixtureOfBlocksAttention(nn.Module, AttentionLayerBase):
                 dtype=self.kv_cache_torch_dtype,
             )
 
-from vllm.attention.layer import Attention
-
 class MoBA_Attention(nn.Module):
 
     def __init__(
@@ -396,7 +460,7 @@ class MoBA_Attention(nn.Module):
         qk_norm: bool = False,
         window_size: int | None = None,
         rope_theta: float | None = 10000.,
-        rope_scaling: float | None = None,
+        rope_scaling: dict | float | None = None,
         is_moba: bool = False,
         moba_chunk_size: int = 1024,
         moba_topk: int = 4,
@@ -473,10 +537,16 @@ class MoBA_Attention(nn.Module):
         #     is_neox_style=True,
         #     dtype=torch.float32,
         # )
-        rope_parameters = dict()
-        rope_parameters['rope_theta'] = rope_theta
+        rope_parameters = {"rope_theta": rope_theta}
         if rope_scaling is not None:
-            rope_parameters['factor'] = rope_scaling
+            if isinstance(rope_scaling, dict):
+                # vLLM get_rope expects rope_type-style dictionaries.
+                rope_parameters.update(rope_scaling)
+                if "type" in rope_parameters and "rope_type" not in rope_parameters:
+                    rope_parameters["rope_type"] = rope_parameters.pop("type")
+            else:
+                # Backward-compatible path for legacy float scaling configs.
+                rope_parameters["factor"] = rope_scaling
         self.rotary = get_rope(
             self.head_dim,
             max_position=self.max_position_embeddings,

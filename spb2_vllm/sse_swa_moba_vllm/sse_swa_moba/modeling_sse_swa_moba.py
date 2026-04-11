@@ -53,12 +53,15 @@ from vllm.model_executor.models.interfaces import (
 from vllm.model_executor.models.utils import (
     AutoWeightsLoader,
     PPMissingLayer,
+    WeightsMapper,
     extract_layer_index,
     is_pp_missing_parameter,
     make_empty_intermediate_tensors_factory,
     make_layers,
     maybe_prefix,
 )
+from vllm.model_executor.layers.mamba.mamba_utils import MambaStateCopyFunc
+
 
 logger = init_logger(__name__)
 
@@ -293,12 +296,15 @@ class SseSwaMobaModel(nn.Module):
                 # residual=residual,
                 positions=positions,
             )
-        
+
         if not get_pp_group().is_last_rank:
             return IntermediateTensors({
                 "hidden_states": hidden_states,
                 "residual": residual,
             })
+        # if self.config.fuse_norm:
+        #     hidden_states, _ = self.norm(hidden_states, residual)
+        # else:
         hidden_states = self.norm(hidden_states)
         return hidden_states
     
@@ -317,11 +323,14 @@ class SseSwaMobaForCausalLM(
         self.model_config = vllm_config.model_config
         cache_config = vllm_config.cache_config
         scheduler_config = vllm_config.scheduler_config
-        assert not cache_config.enable_prefix_caching, (
-            "SseSwaMoba currently does not support prefix caching"
-        )
         self.quant_config = vllm_config.quant_config
 
+        if cache_config.mamba_cache_mode == "all":
+            raise NotImplementedError(
+                "SseSwaMoba currently does not support 'all' prefix caching, "
+                "please use '--mamba-cache-mode=align' instead"
+            )
+        
         super().__init__()
         self.config = config
         self.scheduler_config = scheduler_config
@@ -370,7 +379,7 @@ class SseSwaMobaForCausalLM(
     def get_mamba_state_dtype_from_config(
         cls,
         vllm_config: "VllmConfig",
-    ) -> tuple[torch.dtype, torch.dtype]:
+    ) -> tuple[torch.dtype, torch.dtype, torch.dtype] | tuple[torch.dtype]:
         return SSE_GDN_H.SSE_GDN_H_state_dtype(
             vllm_config.model_config.dtype, vllm_config.cache_config.mamba_cache_dtype
         )
@@ -378,7 +387,7 @@ class SseSwaMobaForCausalLM(
     @classmethod
     def get_mamba_state_shape_from_config(
         cls, vllm_config: "VllmConfig"
-    ) -> tuple[tuple[int, int], tuple[int, int], tuple[int, int]]:
+    ) -> tuple[tuple[int, int], tuple[int, int], tuple[int, int]] | tuple[tuple[int, int]]:
         parallel_config = vllm_config.parallel_config
         hf_config = vllm_config.model_config.hf_config
         tp_size = parallel_config.tensor_parallel_size
@@ -387,17 +396,26 @@ class SseSwaMobaForCausalLM(
         #     if vllm_config.speculative_config
         #     else 0
         # )
+        n_v = (
+            hf_config.num_v_heads
+            if getattr(hf_config, "num_v_heads", None) is not None
+            else hf_config.num_heads
+        )
         return SSE_GDN_H.SSE_GDN_H_state_shape(
             tp_size,
             num_heads=hf_config.num_heads,
-            num_v_heads=hf_config.num_heads,
+            num_v_heads=n_v,
             head_k_dim=hf_config.head_dim,
-            head_v_dim=hf_config.head_dim * hf_config.expand_v,
+            head_v_dim=int(hf_config.head_dim * hf_config.expand_v),
             use_short_conv=hf_config.use_short_conv,
             conv_kernel_size=hf_config.conv_size,
             sparse_partition=hf_config.num_sparse_partition,
         )
     
+    @classmethod
+    def get_mamba_state_copy_func(cls) -> tuple[MambaStateCopyFunc, MambaStateCopyFunc, MambaStateCopyFunc] | tuple[MambaStateCopyFunc]:
+        return SSE_GDN_H.get_SSE_GDN_H_state_copy_func()
+
     def compute_logits(
         self,
         hidden_states: torch.Tensor,
@@ -406,10 +424,6 @@ class SseSwaMobaForCausalLM(
 
     
     def load_weights(self, weights: Iterable[tuple[str, torch.Tensor]]):
-        """
-        将 HuggingFace 权重映射并加载到当前 vLLM 模型中。
-        请将此方法放置在你的主模型类（例如 ModelForCausalLM 或 BaseModel）中。
-        """
         
         # 1. HF 命名到 vLLM 模块路径的映射字典
         name_mapping = {
@@ -417,9 +431,6 @@ class SseSwaMobaForCausalLM(
             # === SSE_GDN_H (sse_attn) 内部模块 ===
             "attn.A_log": "attn.sse_attn.A_log",
             "attn.dt_bias": "attn.sse_attn.dt_bias",
-            # "attn.sse_q_proj": "attn.sse_attn.sse_q_proj",
-            # "attn.sse_k_proj": "attn.sse_attn.sse_k_proj",
-            # "attn.sse_v_proj": "attn.sse_attn.sse_v_proj",
             "attn.lora_q_proj.0": "attn.sse_attn.lora_q_proj_A",
             "attn.lora_q_proj.1": "attn.sse_attn.lora_q_proj_B",
             "attn.lora_k_proj.0": "attn.sse_attn.lora_k_proj_A",
@@ -441,20 +452,20 @@ class SseSwaMobaForCausalLM(
             # 注：sse_merge_norm 和 swa_merge_norm 直接在 SSE_SWA_Hybrid 中，路径无需映射
         }
 
-        # 2. 需要合并权重的张量映射 (HF 名称 -> vLLM 目标名称, QKV shard_id)
+        # 2. 需要合并权重的张量映射 (vLLM 目标名称, HF 名称, QKV shard_id)
         stacked_params_mapping = [
             # MoBA and Full Attention QKV 合并
             ("attn.qkv_proj", "attn.q_proj", "q"),
             ("attn.qkv_proj", "attn.k_proj", "k"),
             ("attn.qkv_proj", "attn.v_proj", "v"),
             # SSE Attention QKV 合并
-            ("attn.sse_attn.sse_qkv_proj", "attn.sse_q_proj", 0),
-            ("attn.sse_attn.sse_qkv_proj", "attn.sse_k_proj", 1),
-            ("attn.sse_attn.sse_qkv_proj", "attn.sse_v_proj", 2),
+            ("attn.sse_attn.qkv_proj", "attn.sse_q_proj", 0),
+            ("attn.sse_attn.qkv_proj", "attn.sse_k_proj", 1),
+            ("attn.sse_attn.qkv_proj", "attn.sse_v_proj", 2),
             # SWA Attention QKV 合并 
-            ("attn.swa_attn.swa_qkv_proj", "attn.swa_q_proj", "q"),
-            ("attn.swa_attn.swa_qkv_proj", "attn.swa_k_proj", "k"),
-            ("attn.swa_attn.swa_qkv_proj", "attn.swa_v_proj", "v"),
+            ("attn.swa_attn.qkv_proj", "attn.swa_q_proj", "q"),
+            ("attn.swa_attn.qkv_proj", "attn.swa_k_proj", "k"),
+            ("attn.swa_attn.qkv_proj", "attn.swa_v_proj", "v"),
             
             # MLP Gate/Up 合并 
             ("mlp.gate_up_proj", "mlp.gate_proj", 0),
@@ -479,10 +490,6 @@ class SseSwaMobaForCausalLM(
                     shard_id = shard
                     break
 
-            # 如果遇到模型中不需要的参数（例如不需要加载的 rotary_emb.inv_freq），可在这里跳过
-            if "rotary_emb.inv_freq" in name:
-                continue
-
             if name not in params_dict:
                 # logger.warning(f"跳过未在 vLLM 模型结构中找到的权重: {name}")
                 continue
@@ -500,7 +507,6 @@ class SseSwaMobaForCausalLM(
                 # 针对 QKVParallelLinear / MergedColumnParallelLinear 加载指定 shard
                 weight_loader(param, loaded_weight, shard_id)
             else:
-                # 标准加载
                 weight_loader(param, loaded_weight)
         
         # --- 步骤 E: 检查是否有模型参数未被加载 ---

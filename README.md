@@ -1,153 +1,99 @@
 # SpikingBrain2.0
 
----
+SpikingBrain2.0 is a brain-inspired hybrid foundation model family for long-context language and vision-language modeling.
 
-## About SpikingBrain2.0
+Building on [SpikingBrain1.0](https://github.com/BICLab/SpikingBrain-7B), this repository includes both **SpikingBrain2.0** for language modeling and **SpikingBrain2.0-VL** for vision-language modeling. SpikingBrain2.0 adopts an inter-layer hybrid architecture that combines **Sparse Softmax Attention** ([MoBA](https://github.com/MoonshotAI/MoBA)) with **Sparse Linear Attention** ([SSE](https://openreview.net/pdf?id=R6DrJ4tnGV)), aiming to better balance modeling capability and computational efficiency while alleviating contextual memory interference in long sequences.
 
-Building on [SpikingBrain1.0](https://github.com/BICLab/SpikingBrain-7B), **SpikingBrain2.0** marks our next step toward brain-inspired foundation models for long-context intelligence, comprising [SpikingBrain2.0-5B](https://www.modelscope.cn/profile/Panyuqi) for language modeling and [SpikingBrain2.0-VL-5B](https://www.modelscope.cn/models/zhongfangzhi/SpikeBrain-2.0-VL) for vision-language modeling. It adopts an inter-layer hybrid architecture that combines Sparse Softmax Attention ([MoBA](https://github.com/MoonshotAI/MoBA)) with Sparse Linear Attention ([SSE](https://openreview.net/pdf?id=R6DrJ4tnGV)), achieving a stronger balance between modeling capability and computational efficiency while alleviating contextual memory interference in long sequences. To support efficient architecture migration, **SpikingBrain2.0** is further built upon a lightweight Transformer-to-Hybrid conversion pipeline, enabling both LLMs and VLMs to be adapted from open-source Transformer backbones at very low cost. With fewer than 7k A100 GPU hours, it recovers most of the backbone model’s capabilities and delivers competitive performance across general, reasoning, and multimodal benchmarks.
+To support efficient architecture migration, SpikingBrain2.0 is further built upon a lightweight Transformer-to-Hybrid conversion pipeline, enabling both LLMs and VLMs to be adapted from open-source Transformer backbones at very low cost. With fewer than **7k A100 GPU hours**, it recovers most of the backbone model’s capabilities and achieves competitive performance across general, reasoning, and multimodal benchmarks.
 
----
+![](assets/fig1.pdf)
 
-## Available Models 🧩
-The model weights are hosted on **ModelScope**. Please select the appropriate version based on your needs:
 
-- [SpikingBrain-2.0-base-8k](https://www.modelscope.cn/models/Panyuqi/SpikingBrain-2.0-base-8k)
-- [SpikingBrain-2.0-base-64k](https://www.modelscope.cn/models/Panyuqi/SpikingBrain-2.0-base-64k)
-- [SpikingBrain-2.0-base-256k](https://www.modelscope.cn/models/Panyuqi/SpikingBrain-2.0-base-256k)
-- [SpikingBrain-2.0-base-512k](https://www.modelscope.cn/models/Panyuqi/SpikingBrain-2.0-base-512k)
-- [SpikingBrain-2.0-instruct](https://www.modelscope.cn/models/Panyuqi/SpikingBrain-2.0-instruct)
-- [SpikingBrain-2.0-think](https://www.modelscope.cn/models/Panyuqi/SpikingBrain-2.0-think)
-- [SpikingBrain-2.0-VL](https://www.modelscope.cn/models/zhongfangzhi/SpikeBrain-2.0-VL)
 
----
+## Repository Structure
 
-## Project Structure
-This repository provides the full implementation **SpikingBrain2.0**, including the **HuggingFace version LLM**, **vLLM inference version LLM**, and the implementation **SpikingBrain2.0-VL**, enabling flexible deployment and research across different scenarios.
-
-```
+```text
 SpikingBrain2.0/
-├── spb2/ # Hugging Face implementation of SpB2.0 LLM, with configuration files for each stage of training.
-├── spb2_vllm/ # vLLM plugin for SpB2.0 inference
-├── spb2vl/ # Hugging Face implementation of SpB2.0-VL
-├── flash-linear-attention_dev # fla with SSE implementation
-├── MoBA # MoBA adapted to the new FlashAttention interface
-└── README.md 
+├── spb2/                        # Hugging Face implementation of SpikingBrain2.0 LLM
+├── spb2vl/                      # Hugging Face implementation of SpikingBrain2.0-VL
+├── spb2_vllm/                   # vLLM inference plugin adapted for both SpikingBrain2.0 LLM and SpikingBrain2.0-VL
+├── flash-linear-attention_dev/  # Customized flash-linear-attention with SSE support
+├── MoBA/                        # Customized MoBA adapted to the newer FlashAttention interface for Hugging Face
+└── README.md
 ```
-
---- 
 
 ## Dependency Notes
 
-This repository includes two important local dependency trees:
+This repository includes two important local dependency trees.
 
-`flash-linear-attention_dev`
+### `flash-linear-attention_dev`
 
-This directory contains a **modified version of flash-linear-attention with added SSE support**. In **SpikingBrain2.0**, the [SSE](https://openreview.net/pdf?id=R6DrJ4tnGV) model is built as a **S**parse **S**tate **E**xpansion over [Gated DeltaNet](https://openreview.net/pdf?id=r8H7xhYPwz). By extending the compressed recurrent memory of GDN into multiple sparsely updated state partitions, **SSE** increases effective memory capacity and enhances long-context retrieval, while largely preserving the efficiency benefits of linear recurrent modeling.
+`flash-linear-attention_dev/` contains a modified version of flash-linear-attention with added SSE support.
 
- `MoBA`
+In SpikingBrain2.0, [SSE](https://openreview.net/pdf?id=R6DrJ4tnGV) is built as a **Sparse State Expansion** mechanism over [Gated DeltaNet](https://openreview.net/pdf?id=r8H7xhYPwz). By extending the compressed recurrent memory of Gated DeltaNet into multiple sparsely updated state partitions, SSE improves effective memory capacity and long-context retrieval while largely preserving the efficiency benefits of recurrent linear modeling.
 
-This directory contains a **MoBA implementation whose interfaces were adapted to the newer FlashAttention API**.
+### `MoBA`
 
-- The bundled **`MoBA/` directory mainly serves the Hugging Face side**, including both **`spb2` (LLM)** and **`spb2vl` (VLM)**.
-- The **vLLM side does not use this bundled `MoBA/` implementation**. Instead, **`spb2_vllm` uses the official `flash-moba` package**.
+`MoBA/` contains a customized MoBA implementation whose interfaces were adapted to the newer FlashAttention API used by this repository.
 
-For `spb2_vllm`, the runtime environment additionally requires:
+This bundled `MoBA/` directory is intended for the **Hugging Face side** of the repository, including:
 
-- **`flash_moba==2.0.0`**
-- official repository: `https://github.com/mit-han-lab/flash-moba`
+- `spb2` for LLM
+- `spb2vl` for VLM
 
----
+For the **vLLM side**, `spb2_vllm` does **not** use the bundled `MoBA/`. Instead, it depends on the official **`flash-moba`** package.
 
-## `spb2` (Hugging Face LLM)
+Official repository:
 
-### Environment Setup
-
-`spb2` requires the following core versions:
+- `https://github.com/mit-han-lab/flash-moba`
 
 
-```bash
-# create and activate your environment first,
+## Environment Setup
 
-pip install transformers==4.57.1
-pip install triton==3.2.0
-pip install flash-attn==2.7.3
+It is recommended to create separate environments for different components if needed.
 
-# flash-linear-attention should be installed from the bundled `flash-linear-attention_dev/`
-cd flash-linear-attention_dev
-pip install -e .
-cd ..
+### `spb2` (Hugging Face LLM)
 
-# MoBA should be installed from the bundled `MoBA/`
-cd MoBA
-pip install -e .
-cd ..
+#### Setup suggestion
+
+```text
+transformers==4.57.1
+triton==3.2.0
+flash-attn==2.7.3
+flash-linear-attention_dev  # use the local version in this repo
+MoBA                        # use the local version in this repo
 ```
 
----
+### `spb2vl` (Hugging Face VLM)
 
-## `spb2vl` (Hugging Face VLM)
+#### Setup suggestion
 
-### Environment Setup
-
-`spb2vl` requires the following core versions:
-
-
-```bash
-# create and activate your environment first
-
-pip install transformers==4.57.3
-pip install flash_attn==2.6.3
-
-# flash-linear-attention should be installed from the bundled `flash-linear-attention_dev/`
-cd flash-linear-attention_dev
-pip install -e .
-cd ..
-
-# MoBA should be installed from the bundled `MoBA/`
-cd MoBA
-pip install -e .
-cd ..
+```text
+transformers==4.57.3
+flash_attn==2.6.3
+flash-linear-attention_dev  # use the local version in this repo
+MoBA                        # use the local version in this repo
 ```
 
----
+### `spb2_vllm` (vLLM inference plugin for both LLM and VLM)
 
-## `spb2_vllm` (vLLM plugin)
+#### Setup suggestion
 
-### Environment
-
-`spb2_vllm` requires the following core versions:
-
-
-```bash
-# create and activate your environment first
-
-pip install "torch>=2.9.0"
-pip install "transformers>=4.57.0"
-pip install triton==3.5.0
-pip install flash_attn==2.8.3
-pip install vllm==0.13.0
-pip install setuptools scipy
-
-#  details in https://github.com/mit-han-lab/flash-moba
-git clone https://github.com/mit-han-lab/flash-moba
-cd flash-moba
-MAX_JOBS=32 python setup.py install
-cd ..
-
-# flash-linear-attention should be installed from the bundled `flash-linear-attention_dev/`
-cd flash-linear-attention_dev
-pip install -e .
-cd ..
-
-cd spb2_vllm
-pip install -e .
-cd ..
+```text
+torch>=2.10.0
+transformers>=4.57.0
+triton==3.6.0
+flash_attn==2.8.3
+vllm==0.17.1
+flash_moba==2.0.0
+setuptools
+scipy
+flash-linear-attention_dev  # use the local version in this repo
 ```
 
-### Usage
+#### vLLM Usage
 
-After installing the plugin, you can launch SpB2.0 with vLLM. A typical command is:
-
+After installing the plugin and required dependencies, you can launch SpikingBrain2.0 with vLLM.
 
 ```bash
 vllm serve <your_model_path> \
@@ -164,7 +110,11 @@ vllm serve <your_model_path> \
   --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY"}'
 ```
 
-Please make sure to remove the `auto_map` field from `config.json`. Specifically, delete the following block if it is present:
+#### Configuration Note for vLLM
+
+Please remove the `auto_map` field from `config.json` before launching with vLLM.
+
+Delete the following block if it is present:
 
 ```json
 "auto_map": {
@@ -173,5 +123,31 @@ Please make sure to remove the `auto_map` field from `config.json`. Specifically
 }
 ```
 
----
+## Available Models
+
+Model weights are hosted on **ModelScope**:
+
+- [SpikingBrain-2.0-base-8k](https://www.modelscope.cn/models/Panyuqi/SpikingBrain-2.0-base-8k)
+- [SpikingBrain-2.0-base-64k](https://www.modelscope.cn/models/Panyuqi/SpikingBrain-2.0-base-64k)
+- [SpikingBrain-2.0-base-256k](https://www.modelscope.cn/models/Panyuqi/SpikingBrain-2.0-base-256k)
+- [SpikingBrain-2.0-base-512k](https://www.modelscope.cn/models/Panyuqi/SpikingBrain-2.0-base-512k)
+- [SpikingBrain-2.0-instruct](https://www.modelscope.cn/models/Panyuqi/SpikingBrain-2.0-instruct)
+- [SpikingBrain-2.0-think](https://www.modelscope.cn/models/Panyuqi/SpikingBrain-2.0-think)
+- [SpikingBrain-2.0-VL](https://www.modelscope.cn/models/zhongfangzhi/SpikeBrain-2.0-VL)
+
+
+
+## Citation
+
+If you find our work useful, please consider citing SpikingBrain2.0:
+
+```bibtex
+@article{pan2026spikingbrain2.0,
+  title={SpikingBrain2.0},
+  author={},
+  journal={arXiv preprint arXiv:},
+  year={2026}
+}
+
+```
 

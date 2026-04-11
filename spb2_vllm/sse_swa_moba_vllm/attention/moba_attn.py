@@ -10,25 +10,21 @@ from dataclasses import dataclass
 
 import torch
 
-from vllm.attention.backends.abstract import (
-    AttentionBackend,
-    AttentionImpl,
-    AttentionType,
+
+from vllm.v1.attention.backend import (
+    AttentionBackend, AttentionType, AttentionImpl, AttentionCGSupport, AttentionMetadataBuilder
 )
-from vllm.attention.utils.fa_utils import (
-    is_flash_attn_varlen_func_available,
-)
+from vllm.v1.attention.backends.fa_utils import is_flash_attn_varlen_func_available
 
 if is_flash_attn_varlen_func_available():
-    from vllm.attention.utils.fa_utils import (
+    from vllm.v1.attention.backends.fa_utils import (
         flash_attn_varlen_func,
         reshape_and_cache_flash,
     )
 from vllm.logger import init_logger
 
 from vllm.v1.attention.backends.utils import (
-    AttentionCGSupport,
-    AttentionMetadataBuilder,
+    
     CommonAttentionMetadata,
     split_decodes_and_prefills,
 )
@@ -170,11 +166,19 @@ class SseMobaFlashAttentionImpl(FlashAttentionImpl):
     ) -> torch.Tensor:
         # print(f"Running SseMobaFlashAttentionImpl forward with is_moba={self.is_moba}, type of attn_metadata: {type(attn_metadata)}")
         assert output is not None, "Output tensor must be provided."
+        if output_scale is not None or output_block_scale is not None:
+            raise NotImplementedError(
+                "fused output quantization is not yet supported for FlashAttentionImpl"
+            )
         if attn_metadata is None:
             # Profiling run.
             return output.fill_(0)
         
-        if not self.is_moba:
+        # max_seq_len is the total sequence length including both decode and prefill tokens. 
+        # When it's smaller than moba_topk * moba_chunk_size, 
+        # we can directly run flash attention without splitting decode and prefill, which is more efficient. 
+        # Otherwise, we run MoBA attention.
+        if (not self.is_moba) or (self.moba_topk * self.moba_chunk_size >= attn_metadata.max_seq_len):
             return super().forward(
                 layer=layer,
                 query=query,
@@ -197,31 +201,7 @@ class SseMobaFlashAttentionImpl(FlashAttentionImpl):
             max_seqlen_q = attn_metadata.max_query_len
             
             key_cache, value_cache = kv_cache.unbind(0)
-            # key and value may be None in the case of cross attention. They are
-            # calculated once based on the output from the encoder and then cached
-            # in KV cache.
-            if (
-                self.kv_sharing_target_layer_name is None
-                and key is not None
-                and value is not None
-            ):
-                # Reshape the input keys and values and store them in the cache.
-                # Skip this if sharing KV cache with an earlier attention layer.
-                # NOTE(woosuk): Here, key and value are padded while slot_mapping is
-                # not padded. However, we don't need to do key[:num_actual_tokens]
-                # and value[:num_actual_tokens] because the reshape_and_cache_flash
-                # op uses the slot_mapping's shape to determine the number of
-                # actual tokens.
-                reshape_and_cache_flash(
-                    key,
-                    value,
-                    key_cache,
-                    value_cache,
-                    attn_metadata.slot_mapping,
-                    self.kv_cache_dtype,
-                    layer._k_scale,
-                    layer._v_scale,
-                )
+            # move kv cache update to attention layer.
 
             if self.kv_cache_dtype.startswith("fp8"):
                 # queries are quantized in the attention layer
@@ -230,7 +210,8 @@ class SseMobaFlashAttentionImpl(FlashAttentionImpl):
                 )
                 key_cache = key_cache.view(dtype)
                 value_cache = value_cache.view(dtype)
-
+            
+            
             if num_prefill_tokens > 0:
                 q_p = query[num_decode_tokens: num_decode_tokens + num_prefill_tokens]
                 cu_base = cu_seqlens_q[num_decodes]
