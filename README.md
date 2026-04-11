@@ -135,6 +135,26 @@ Model weights are hosted on **ModelScope**:
 - [SpikingBrain-2.0-think](https://www.modelscope.cn/models/Panyuqi/SpikingBrain-2.0-think)
 - [SpikingBrain-2.0-VL](https://www.modelscope.cn/models/zhongfangzhi/SpikeBrain-2.0-VL)
 
+### Performance Evaluation
+
+Table 1: **TTFT comparison between Qwen3-4B and SpB2.0-5B under HuggingFace sequence parallelism.**
+![](assets/table1.png)
+
+Table 2: **Comparison of SpB2.0-5B with other strong open-source base models**
+![](assets/table2.png)
+
+
+Table 3: **Comparison of SpB2.0-5B with other strong open-source instruction-tuned models** 
+![](assets/table3.png)
+
+Table 4: **Comparison of SpB2.0-5B with other strong open-source reasoning models** 
+![](assets/table4.png)
+
+Table 5: **Comparison of SpB2.0-VL-5B with other strong open-source VLMs on multimodal benchmarks** 
+![](assets/table5.png)
+
+--- 
+
 
 
 ## Citation
