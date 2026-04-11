@@ -1,5 +1,13 @@
 # SpikingBrain2.0
 
+📄 Technical Report: [English](SpikingBrain_Report_Eng.pdf)  
+🚀 Arxiv: [arXiv:2509.05276](https://www.arxiv.org/abs/2509.05276)  
+🧩 Models: [Available Models](#available-models)      
+
+---
+
+## About SpikingBrain2.0
+
 SpikingBrain2.0 is a brain-inspired hybrid foundation model family for long-context language and vision-language modeling.
 
 Building on [SpikingBrain1.0](https://github.com/BICLab/SpikingBrain-7B), this repository includes both **SpikingBrain2.0** for language modeling and **SpikingBrain2.0-VL** for vision-language modeling. SpikingBrain2.0 adopts an inter-layer hybrid architecture that combines **Sparse Softmax Attention** ([MoBA](https://github.com/MoonshotAI/MoBA)) with **Sparse Linear Attention** ([SSE](https://openreview.net/pdf?id=R6DrJ4tnGV)), aiming to better balance modeling capability and computational efficiency while alleviating contextual memory interference in long sequences.
@@ -26,7 +34,6 @@ SpikingBrain2.0/
 
 This repository includes two important local dependency trees.
 
----
 
 `flash-linear-attention_dev/` contains a modified version of flash-linear-attention with added SSE support.
 
@@ -34,14 +41,7 @@ In SpikingBrain2.0, [SSE](https://openreview.net/pdf?id=R6DrJ4tnGV) is built as 
 
 ---
 
-`MoBA/` contains a customized MoBA implementation whose interfaces were adapted to the newer FlashAttention API used by this repository.
-
-This bundled `MoBA/` directory is intended for the **Hugging Face side** of the repository, including:
-
-- `spb2` for LLM
-- `spb2vl` for VLM
-
-For the **vLLM side**, `spb2_vllm` does **not** use the bundled `MoBA/`. Instead, it depends on the official **`flash-moba`** package.
+`MoBA/` contains a customized MoBA implementation whose interfaces were adapted to the newer FlashAttention API used by this repository.This bundled `MoBA/` directory is intended for the **Hugging Face side** of the repository.For the **vLLM side**, `spb2_vllm` does **not** use the bundled `MoBA/`. Instead, it depends on the official **`flash-moba`** package.
 
 Official repository:
 
@@ -52,7 +52,7 @@ Official repository:
 
 It is recommended to create separate environments for different components if needed.
 
-### `spb2` (Hugging Face LLM)
+### Hugging Face LLM (spb2)
 
 #### Setup suggestion
 
@@ -64,7 +64,7 @@ flash-linear-attention_dev  # use the local version in this repo
 MoBA                        # use the local version in this repo
 ```
 
-### `spb2vl` (Hugging Face VLM)
+### `Hugging Face VLM(spb2)
 
 #### Setup suggestion
 
@@ -75,7 +75,7 @@ flash-linear-attention_dev  # use the local version in this repo
 MoBA                        # use the local version in this repo
 ```
 
-### `spb2_vllm` (vLLM inference plugin for both LLM and VLM)
+### vLLM inference plugin for both LLM and VLM(spb2_vllm)
 
 #### Setup suggestion
 
