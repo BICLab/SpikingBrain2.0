@@ -6,7 +6,7 @@ Building on [SpikingBrain1.0](https://github.com/BICLab/SpikingBrain-7B), this r
 
 To support efficient architecture migration, SpikingBrain2.0 is further built upon a lightweight Transformer-to-Hybrid conversion pipeline, enabling both LLMs and VLMs to be adapted from open-source Transformer backbones at very low cost. With fewer than **7k A100 GPU hours**, it recovers most of the backbone model’s capabilities and achieves competitive performance across general, reasoning, and multimodal benchmarks.
 
-![](assets/fig1.pdf)
+![](assets/fig1.png)
 
 
 
