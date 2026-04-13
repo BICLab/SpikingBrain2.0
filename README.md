@@ -40,7 +40,7 @@ In SpikingBrain2.0, [SSE](https://openreview.net/pdf?id=R6DrJ4tnGV) is built as 
 
 ---
 
-`MoBA/` contains a customized MoBA implementation whose interfaces were adapted to the newer FlashAttention API used by this repository.This bundled `MoBA/` directory is intended for the **Hugging Face side** of the repository.For the **vLLM side**, `spb2_vllm` does **not** use the bundled `MoBA/`. Instead, it depends on the official **`flash-moba`** package.
+`MoBA/` contains a customized [MoBA](https://github.com/MoonshotAI/MoBA) implementation whose interfaces were adapted to the newer FlashAttention API used by this repository.This bundled `MoBA/` directory is intended for the **Hugging Face side** of the repository.For the **vLLM side**, `spb2_vllm` does **not** use the bundled `MoBA/`. Instead, it depends on the official **`flash-moba`** package.
 
 Official repository:
 
@@ -76,7 +76,7 @@ MoBA                        # use the local version in this repo
 
 ### vLLM inference plugin (spb2_vllm)
 
-**Supports both LLM and VLM inference**
+Note: **Supports both LLM and VLM inference**
 
 #### Setup suggestion
 
