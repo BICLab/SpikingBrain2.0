@@ -141,15 +141,15 @@ vllm serve <your_model_path> \
 
 ### Performance Evaluation
 
-SpikingBrain2.0-5B is evaluated using the checkpoint after the LongCT-512k stage, with only **14B tokens** of continued training after conversion. Despite the lightweight training budget, it achieves performance comparable to other strong open-source base models, remains close to **Qwen3-4B** overall, and even surpasses the base Transformer on several tasks such as **BBH**.
-
 Table 1: **Performance evaluation of the SpikingBrain2.0-5B-base model.** 
 ![](assets/table1.png)
 
-After instruction SFT, SpikingBrain2.0-VL-5B is evaluated on a comprehensive suite of multimodal benchmarks. It delivers competitive performance against strong open-source baselines such as **Qwen2.5-VL-3B** and **LLaVA-OneVision-7B**, while largely recovering the multimodal capability of the base **Qwen3-VL-4B**.
+SpikingBrain2.0-5B is evaluated using the checkpoint after the LongCT-512k stage, with only **14B tokens** of continued training after conversion. Despite the lightweight training budget, it achieves performance comparable to other strong open-source base models, remains close to **Qwen3-4B** overall, and even surpasses the base Transformer on several tasks such as **BBH**.
 
 Table 2: **Performance evaluation of the SpikingBrain2.0-VL-5B model.** 
 ![](assets/table2.png)
+
+After instruction SFT, SpikingBrain2.0-VL-5B is evaluated on a comprehensive suite of multimodal benchmarks. It delivers competitive performance against strong open-source baselines such as **Qwen2.5-VL-3B** and **LLaVA-OneVision-7B**, while largely recovering the multimodal capability of the base **Qwen3-VL-4B**.
 
 --- 
 
