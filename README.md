@@ -1,4 +1,5 @@
-# SpikingBrain2.0：Brain-Inspired Foundation Models with Hybrid Sparse Attention, Dual Quantization Paths, and Multimodal Conversion
+# SpikingBrain2.0：Brain-Inspired Foundation Models 
+Hybrid Sparse Attention, Dual Quantization Paths, and Multimodal Conversion
 
 📄 Technical Report: [English]()  
 🚀 Arxiv: [arXiv:](https://www.arxiv.org/abs/)  
