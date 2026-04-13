@@ -1,5 +1,5 @@
 # SpikingBrain2.0：Brain-Inspired Foundation Models 
-Hybrid Sparse Attention, Dual Quantization Paths, and Multimodal Conversion
+**Hybrid Sparse Attention, Dual Quantization Paths, and Multimodal Conversion**
 
 📄 Technical Report: [English]()  
 🚀 Arxiv: [arXiv:](https://www.arxiv.org/abs/)  
@@ -9,7 +9,9 @@ Hybrid Sparse Attention, Dual Quantization Paths, and Multimodal Conversion
 
 ## About SpikingBrain2.0
 
-SpikingBrain2.0 is a brain-inspired hybrid model family for long-context language modeling and vision-language modeling. Building on  [SpikingBrain1.0](https://github.com/BICLab/SpikingBrain-7B), it adopts an inter-layer hybrid architecture that combines Sparse Softmax Attention ([MoBA](https://github.com/MoonshotAI/MoBA)) with Sparse Linear Attention ([SSE](https://openreview.net/pdf?id=R6DrJ4tnGV)), forming a sparse-memory design that better balances modeling quality, long-context efficiency, and memory usage while alleviating contextual interference in long sequences. It is further supported by a lightweight Transformer-to-Hybrid (T2H) conversion pipeline, enabling both LLMs and VLMs to be adapted from open-source Qwen3 backbones at very low cost; With fewer than 7k A100 GPU hours, it recovers most of the backbone models’ capabilities and achieves competitive results across general, reasoning, and vision-language benchmarks. Beyond capability recovery, SpikingBrain2.0 delivers substantial deployment advantages, including up to 10.13× TTFT speedup at 4M context length, support for 10M+ token serving on 8×A100 GPUs, and dual FP8 and INT8-Spiking quantization paths for both practical GPU acceleration and neuromorphic-friendly execution. Notably, the INT8-Spiking path achieves 64.31% spike-sequence sparsity with minimal accuracy loss, while hardware simulation shows about 46.5%–48.1% power reduction, making SpikingBrain2.0 a lightweight, scalable, and energy-efficient solution for building efficient long-context foundation models.
+SpikingBrain2.0 is a brain-inspired hybrid model family for long-context language modeling and vision-language modeling. Building on  [SpikingBrain1.0](https://github.com/BICLab/SpikingBrain-7B), it adopts an inter-layer hybrid architecture that combines Sparse Softmax Attention ([MoBA](https://github.com/MoonshotAI/MoBA)) with Sparse Linear Attention ([SSE](https://openreview.net/pdf?id=R6DrJ4tnGV)), forming a sparse-memory design that better balances modeling quality, long-context efficiency, and memory usage while alleviating contextual interference in long sequences. It is further supported by a lightweight Transformer-to-Hybrid (T2H) conversion pipeline, enabling both LLMs and VLMs to be adapted from open-source Qwen3 backbones at very low cost; With fewer than 7k A100 GPU hours, it recovers most of the backbone models’ capabilities and achieves competitive results across general, reasoning, and vision-language benchmarks. 
+
+Beyond capability recovery, SpikingBrain2.0 delivers substantial deployment advantages, including up to 10.13× TTFT speedup at 4M context length, support for 10M+ token serving on 8×A100 GPUs, and dual FP8 and INT8-Spiking quantization paths for both practical GPU acceleration and neuromorphic-friendly execution. Notably, the INT8-Spiking path achieves 64.31% spike-sequence sparsity with minimal accuracy loss, while hardware simulation shows about 46.5%–48.1% power reduction, making SpikingBrain2.0 a lightweight, scalable, and energy-efficient solution for building efficient long-context foundation models.
 
 ![](assets/fig1.png)
 
@@ -118,8 +120,10 @@ Example scripts are provided in [`run_model/`](run_model) for running the releas
   "AutoConfig": "configuration_sse_swa_moba.SSESWAMoBAConfig",
   "AutoModelForCausalLM": "modeling_sse_swa_moba.SSESWAMoBAForCausalLM"
 }
+```
 
 You can also launch a vLLM server directly from the terminal:
+
 ```bash
 vllm serve <your_model_path> \
   --served-model-name <model_name> \
@@ -134,6 +138,20 @@ vllm serve <your_model_path> \
   --port 8000 \
   --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY"}'
 ```
+
+### Performance Evaluation
+
+SpikingBrain2.0-5B is evaluated using the checkpoint after the LongCT-512k stage, with only **14B tokens** of continued training after conversion. Despite the lightweight training budget, it achieves performance comparable to other strong open-source base models, remains close to **Qwen3-4B** overall, and even surpasses the base Transformer on several tasks such as **BBH**.
+
+Table 1: **Performance evaluation of the SpikingBrain2.0-5B-base model.** 
+![](assets/table1.png)
+
+After instruction SFT, SpikingBrain2.0-VL-5B is evaluated on a comprehensive suite of multimodal benchmarks. It delivers competitive performance against strong open-source baselines such as **Qwen2.5-VL-3B** and **LLaVA-OneVision-7B**, while largely recovering the multimodal capability of the base **Qwen3-VL-4B**.
+
+Table 2: **Performance evaluation of the SpikingBrain2.0-VL-5B model.** 
+![](assets/table2.png)
+
+--- 
 
 
 ## Citation
