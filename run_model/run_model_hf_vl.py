@@ -3,8 +3,8 @@ from PIL import Image
 from transformers import AutoModelForCausalLM, AutoProcessor
 
 
-MODEL_PATH = "/mnt/jfzn/sbh/SpikeBrain-2.0-VL_real/SpikeBrain-2.0-VL"
-IMAGE_PATH = "/mnt/jfzn/sbh/SpikeBrain-2.0-VL_real/88dcd17c04af9a0ce1fb51d6d5417636.png"
+MODEL_PATH = "SpikeBrain-2.0-VL"
+IMAGE_PATH = "image.png"
 QUESTION = "这张图主要说明了什么自然过程？请按顺序说明水是如何循环的。"
 DEVICE = "cuda"
 MAX_NEW_TOKENS = 256

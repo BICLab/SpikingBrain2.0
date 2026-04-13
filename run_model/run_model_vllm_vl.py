@@ -17,7 +17,7 @@ def parse_args():
     parser.add_argument(
         "--image-path",
         type=str,
-        default="/mnt/jfzn/sbh/SpikeBrain-2.0-VL_real/88dcd17c04af9a0ce1fb51d6d5417636.png",
+        default="image.png",
         help="Input image path.",
     )
     parser.add_argument(
@@ -46,7 +46,7 @@ def import_plugin():
         return sse_swa_moba_vllm
     except ImportError:
         # Fallback for environments where editable install is not activated.
-        plugin_root = "/mnt/jfzn/zjh/vllm_for_sp2"
+        plugin_root = "SpikingBrain2.0/spb2_vllm"
         if plugin_root not in sys.path:
             sys.path.append(plugin_root)
         import sse_swa_moba_vllm  # type: ignore

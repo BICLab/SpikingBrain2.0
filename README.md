@@ -1,21 +1,16 @@
-# SpikingBrain2.0：Spiking Brain-inspired Large Models
+# SpikingBrain2.0：Brain-Inspired Foundation Models with Hybrid Sparse Attention, Dual Quantization Paths, and Multimodal Conversion
 
-📄 Technical Report: [English](SpikingBrain_Report_Eng.pdf)  
-🚀 Arxiv: [arXiv:2509.05276](https://www.arxiv.org/abs/2509.05276)  
+📄 Technical Report: [English]()  
+🚀 Arxiv: [arXiv:](https://www.arxiv.org/abs/)  
 🧩 Models: [Available Models](#available-models)      
 
 ---
 
 ## About SpikingBrain2.0
 
-SpikingBrain2.0 is a brain-inspired hybrid foundation model family for long-context language and vision-language modeling.
-
-Building on [SpikingBrain1.0](https://github.com/BICLab/SpikingBrain-7B), this repository includes both **SpikingBrain2.0** for language modeling and **SpikingBrain2.0-VL** for vision-language modeling. SpikingBrain2.0 adopts an inter-layer hybrid architecture that combines **Sparse Softmax Attention** ([MoBA](https://github.com/MoonshotAI/MoBA)) with **Sparse Linear Attention** ([SSE](https://openreview.net/pdf?id=R6DrJ4tnGV)), aiming to better balance modeling capability and computational efficiency while alleviating contextual memory interference in long sequences.
-
-To support efficient architecture migration, SpikingBrain2.0 is further built upon a lightweight Transformer-to-Hybrid conversion pipeline, enabling both LLMs and VLMs to be adapted from open-source Transformer backbones at very low cost. With fewer than **7k A100 GPU hours**, it recovers most of the backbone model’s capabilities and achieves competitive performance across general, reasoning, and multimodal benchmarks.
+SpikingBrain2.0 is a brain-inspired hybrid model family for long-context language modeling and vision-language modeling. Building on  [SpikingBrain1.0](https://github.com/BICLab/SpikingBrain-7B), it adopts an inter-layer hybrid architecture that combines Sparse Softmax Attention ([MoBA](https://github.com/MoonshotAI/MoBA)) with Sparse Linear Attention ([SSE](https://openreview.net/pdf?id=R6DrJ4tnGV)), forming a sparse-memory design that better balances modeling quality, long-context efficiency, and memory usage while alleviating contextual interference in long sequences. It is further supported by a lightweight Transformer-to-Hybrid (T2H) conversion pipeline, enabling both LLMs and VLMs to be adapted from open-source Qwen3 backbones at very low cost; With fewer than 7k A100 GPU hours, it recovers most of the backbone models’ capabilities and achieves competitive results across general, reasoning, and vision-language benchmarks. Beyond capability recovery, SpikingBrain2.0 delivers substantial deployment advantages, including up to 10.13× TTFT speedup at 4M context length, support for 10M+ token serving on 8×A100 GPUs, and dual FP8 and INT8-Spiking quantization paths for both practical GPU acceleration and neuromorphic-friendly execution. Notably, the INT8-Spiking path achieves 64.31% spike-sequence sparsity with minimal accuracy loss, while hardware simulation shows about 46.5%–48.1% power reduction, making SpikingBrain2.0 a lightweight, scalable, and energy-efficient solution for building efficient long-context foundation models.
 
 ![](assets/fig1.png)
-
 
 
 ## Repository Structure
@@ -27,6 +22,7 @@ SpikingBrain2.0/
 ├── spb2_vllm/                   # vLLM inference plugin adapted for both SpikingBrain2.0 LLM and SpikingBrain2.0-VL
 ├── flash-linear-attention_dev/  # Customized flash-linear-attention with SSE support
 ├── MoBA/                        # Customized MoBA adapted to the newer FlashAttention interface for Hugging Face
+├── run_model/                   # Example scripts for running models with the released checkpoints
 └── README.md
 ```
 
@@ -91,10 +87,38 @@ scipy
 flash-linear-attention_dev  # use the local version in this repo
 ```
 
-#### vLLM Usage
+## Available Models
 
-After installing the plugin and required dependencies, you can launch SpikingBrain2.0 with vLLM.
+Model weights are hosted on **ModelScope**:
 
+- [SpikingBrain-2.0-base-8k](https://www.modelscope.cn/models/Panyuqi/SpikingBrain-2.0-base-8k)
+- [SpikingBrain-2.0-base-64k](https://www.modelscope.cn/models/Panyuqi/SpikingBrain-2.0-base-64k)
+- [SpikingBrain-2.0-base-256k](https://www.modelscope.cn/models/Panyuqi/SpikingBrain-2.0-base-256k)
+- [SpikingBrain-2.0-base-512k](https://www.modelscope.cn/models/Panyuqi/SpikingBrain-2.0-base-512k)
+- [SpikingBrain-2.0-instruct](https://www.modelscope.cn/models/Panyuqi/SpikingBrain-2.0-instruct)
+- [SpikingBrain-2.0-think](https://www.modelscope.cn/models/Panyuqi/SpikingBrain-2.0-think)
+- [SpikingBrain-2.0-VL](https://www.modelscope.cn/models/zhongfangzhi/SpikeBrain-2.0-VL)
+
+### Usage
+
+Example scripts are provided in [`run_model/`](run_model) for running the released checkpoints.
+
+- **Hugging Face**  
+  Load the model with `AutoModelForCausalLM` and use it as a standard CausalLM for either forward passes or text generation; see [`run_model/run_model_hf_base.py`](run_model/run_model_hf_base.py).  
+  For the SFT model, use the chat template script; see [`run_model/run_model_hf_chat.py`](run_model/run_model_hf_chat.py).  
+  For the vision-language model, see [`run_model/run_model_hf_vl.py`](run_model/run_model_hf_vl.py).
+
+- **vLLM**  
+  Run inference with the provided **spb2_vllm** plugin; see [`run_model/run_model_vllm.py`](run_model/run_model_vllm.py) and [`run_model/run_model_vllm_vl.py`](run_model/run_model_vllm_vl.py).  
+  Before using vLLM, make sure to remove the `auto_map` field from `config.json`. Specifically, delete the following block if it is present:
+
+```json
+"auto_map": {
+  "AutoConfig": "configuration_sse_swa_moba.SSESWAMoBAConfig",
+  "AutoModelForCausalLM": "modeling_sse_swa_moba.SSESWAMoBAForCausalLM"
+}
+
+You can also launch a vLLM server directly from the terminal:
 ```bash
 vllm serve <your_model_path> \
   --served-model-name <model_name> \
@@ -109,31 +133,6 @@ vllm serve <your_model_path> \
   --port 8000 \
   --compilation-config '{"cudagraph_mode": "FULL_DECODE_ONLY"}'
 ```
-
-#### Configuration Note for vLLM
-
-Please remove the `auto_map` field from `config.json` before launching with vLLM.
-
-Delete the following block if it is present:
-
-```json
-"auto_map": {
-  "AutoConfig": "configuration_sse_swa_moba.SSESWAMoBAConfig",
-  "AutoModelForCausalLM": "modeling_sse_swa_moba.SSESWAMoBAForCausalLM"
-}
-```
-
-## Available Models
-
-Model weights are hosted on **ModelScope**:
-
-- [SpikingBrain-2.0-base-8k](https://www.modelscope.cn/models/Panyuqi/SpikingBrain-2.0-base-8k)
-- [SpikingBrain-2.0-base-64k](https://www.modelscope.cn/models/Panyuqi/SpikingBrain-2.0-base-64k)
-- [SpikingBrain-2.0-base-256k](https://www.modelscope.cn/models/Panyuqi/SpikingBrain-2.0-base-256k)
-- [SpikingBrain-2.0-base-512k](https://www.modelscope.cn/models/Panyuqi/SpikingBrain-2.0-base-512k)
-- [SpikingBrain-2.0-instruct](https://www.modelscope.cn/models/Panyuqi/SpikingBrain-2.0-instruct)
-- [SpikingBrain-2.0-think](https://www.modelscope.cn/models/Panyuqi/SpikingBrain-2.0-think)
-- [SpikingBrain-2.0-VL](https://www.modelscope.cn/models/zhongfangzhi/SpikeBrain-2.0-VL)
 
 
 ## Citation
