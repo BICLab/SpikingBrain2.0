@@ -76,6 +76,8 @@ MoBA                        # use the local version in this repo
 
 ### vLLM inference plugin (spb2_vllm)
 
+**Supports both LLM and VLM inference**
+
 #### Setup suggestion
 
 ```text
@@ -84,10 +86,10 @@ transformers>=4.57.0
 triton==3.6.0
 flash_attn==2.8.3
 vllm==0.17.1
-flash_moba==2.0.0
 setuptools
 scipy
 flash-linear-attention_dev  # use the local version in this repo
+flash_moba==2.0.0           # https://github.com/mit-han-lab/flash-moba
 ```
 
 ## Available Models
