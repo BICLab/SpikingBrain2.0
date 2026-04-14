@@ -40,7 +40,7 @@ In SpikingBrain2.0, [SSE](https://openreview.net/pdf?id=R6DrJ4tnGV) is built as 
 
 ---
 
-`MoBA/` contains a customized [MoBA](https://github.com/MoonshotAI/MoBA) implementation whose interfaces were adapted to the newer FlashAttention API used by this repository.This bundled `MoBA/` directory is intended for the **Hugging Face side** of the repository.For the **vLLM side**, `spb2_vllm` does **not** use the bundled `MoBA/`. Instead, it depends on the official **`flash-moba`** package.
+`MoBA/` contains a customized [MoBA](https://github.com/MoonshotAI/MoBA) implementation whose interfaces were adapted to the newer FlashAttention API used by this repository. This bundled `MoBA/` directory is intended for the **Hugging Face side** of the repository. For the **vLLM side**, `spb2_vllm` does **not** use the bundled `MoBA/`. Instead, it depends on the official **`flash-moba`** package.
 
 Official repository:
 
@@ -146,7 +146,7 @@ vllm serve <your_model_path> \
 Table 1: **Performance evaluation of the SpikingBrain2.0-5B-base model.** 
 ![](assets/table1.png)
 
-SpikingBrain2.0-5B is evaluated using the checkpoint after the LongCT-512k stage, with only **14B tokens** of continued training after conversion. Despite the lightweight training budget, it achieves performance comparable to other strong open-source base models, remains close to **Qwen3-4B** overall, and even surpasses the base Transformer on several tasks such as **BBH**.
+SpikingBrain2.0-5B is evaluated using the checkpoint after the LongCT-512k stage, with only **14B tokens** of continued training after conversion. Despite the lightweight training budget, it achieves performance comparable to other strong open-source base models, remains close to **Qwen3-4B** overall.
 
 Table 2: **Performance evaluation of the SpikingBrain2.0-VL-5B model.** 
 ![](assets/table2.png)

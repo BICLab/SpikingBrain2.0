@@ -30,6 +30,10 @@
     "window_size": 128
   },
   "attn_mode": "chunk",
+  "auto_map": {
+    "AutoConfig": "configuration_sse_swa_moba.SSESWAMoBAConfig",
+    "AutoModelForCausalLM": "modeling_sse_swa_moba.SSESWAMoBAForCausalLM"
+  },
   "aux_loss_coef": 0.001,
   "bos_token_id": 151643,
   "conv_size": 4,
@@ -59,7 +63,7 @@
   "rope_scaling": null,
   "sse_implementation": "varlen",
   "sse_qk_relu": false,
-  "swa_dropout": -1,
+  "swa_dropout": 0.5,
   "tie_word_embeddings": true,
   "transformers_version": "4.57.1",
   "use_cache": true,
