@@ -8,10 +8,9 @@
 
 ## About SpikingBrain2.0
 
+**SpikingBrain2.0** advances brain-inspired hybrid foundation modeling with two 5B-scale models, **SpB2.0-5B** and **SpB2.0-VL-5B**. Its architecture introduces **Dual-Space Sparse Attention (DSSA)**, an inter-layer hybrid of Sparse Softmax Attention ([MoBA](https://arxiv.org/abs/2502.13189)) and Sparse Linear Attention ([SSE](https://arxiv.org/abs/2507.16577)), together with **Dual-Path Activation Coding**, which supports both FP8 GPU inference and INT8-Spiking event-driven computation. On the training side, SpikingBrain2.0 develops an optimized **Transformer-to-Hybrid (T2H)** conversion pipeline for LLM and VLM, enabling efficient migration from open-source Transformer backbones. Empirically, SpB2.0 recovers most of the base Transformer capability while achieving a **10.13× TTFT speedup** at 4M context length, with its spiking computation path further showing potential for low-power neuromorphic deployment.
+
 ![](assets/fig1.png)
-
-SpikingBrain2.0 advances brain-inspired hybrid foundation modeling with two 5B-scale models, **SpB2.0-5B** and **SpB2.0-VL-5B**. Its architecture introduces **Dual-Space Sparse Attention (DSSA)**, an inter-layer hybrid of Sparse Softmax Attention ([MoBA](https://arxiv.org/abs/2502.13189)) and Sparse Linear Attention ([SSE](https://arxiv.org/abs/2507.16577)), together with **Dual-Path Activation Coding**, which supports both FP8 GPU inference and INT8-Spiking event-driven computation. On the training side, SpikingBrain2.0 develops an optimized **Transformer-to-Hybrid (T2H)** conversion pipeline for LLM and VLM, enabling efficient migration from open-source Transformer backbones. Empirically, SpB2.0 recovers most of the base Transformer capability while achieving a **10.13× TTFT speedup** at 4M context length, with its spiking computation path further showing potential for low-power neuromorphic deployment.
-
 
 ## Repository Structure
 
