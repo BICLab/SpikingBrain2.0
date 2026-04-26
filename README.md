@@ -8,13 +8,13 @@
 
 ## About SpikingBrain2.0
 
+![](assets/fig1.png)
+
 SpikingBrain2.0 (SpB2.0) is a brain-inspired hybrid model family for efficient long-context language modeling and vision-language modeling. Building on [SpikingBrain1.0](https://github.com/BICLab/SpikingBrain-7B), SpB2.0 introduces **Dual-Space Sparse Attention (DSSA)**, an inter-layer hybrid architecture that combines Sparse Softmax Attention ([MoBA](https://arxiv.org/abs/2502.13189)) with Sparse Linear Attention ([SSE](https://arxiv.org/abs/2507.16577)). This sparse-memory design improves the performance-efficiency trade-off for long-context modeling while reducing memory usage and alleviating contextual interference in long sequences.
 
 SpB2.0 further provides an optimized **Transformer-to-Hybrid (T2H)** conversion pipeline with dual conversion paths for both LLMs and VLMs. Starting from open-source Qwen3 backbones, SpB2.0-5B and SpB2.0-VL-5B recover most of the capabilities of their base Transformer models with fewer than 7k A100 GPU hours of additional training, achieving competitive performance across general, reasoning, long-context, and vision-language benchmarks.
 
 Beyond capability recovery, SpB2.0 offers substantial deployment advantages. Under sequence parallelism, it achieves up to **10.13× TTFT speedup** at 4M context length; under vLLM, it supports serving beyond **10M tokens on 8 A100 GPUs**, where the full-attention baseline exceeds memory limits. SpB2.0 also supports two quantization paths: **FP8** inference for practical acceleration on modern GPUs, reaching **2.52× speedup** at 250k context length, and **INT8-Spiking** coding for sparse event-driven execution on neuromorphic hardware. The INT8-Spiking path achieves **64.31% spike-sequence sparsity** with minimal accuracy loss, while hardware simulation shows **70.6% area reduction** and **46.5% power reduction** at 500MHz.
-
-![](assets/fig1.png)
 
 
 ## Repository Structure
