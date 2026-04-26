@@ -21,11 +21,11 @@ Beyond capability recovery, SpB2.0 offers substantial deployment advantages. Und
 
 ```text
 SpikingBrain2.0/
-├── spb2/                        # Hugging Face implementation of SpikingBrain2.0 LLM
-├── spb2vl/                      # Hugging Face implementation of SpikingBrain2.0-VL
-├── spb2_vllm/                   # vLLM inference plugin adapted for both SpikingBrain2.0 LLM and SpikingBrain2.0-VL
+├── spb2/                        # Hugging Face implementation of SpB2.0-5B
+├── spb2vl/                      # Hugging Face implementation of SpB2.0-VL-5B
+├── spb2_vllm/                   # vLLM inference plugin adapted for both SpB2.0-5B and SpB2.0-VL-5B
 ├── flash-linear-attention_dev/  # Customized flash-linear-attention with SSE support
-├── MoBA/                        # Customized MoBA adapted to the newer FlashAttention interface for Hugging Face
+├── MoBA/                        # Customized MoBA adapted to the newer FlashAttention interface
 ├── run_model/                   # Example scripts for running models with the released checkpoints
 └── README.md
 ```
@@ -64,7 +64,7 @@ flash-linear-attention_dev  # use the local version in this repo
 MoBA                        # use the local version in this repo
 ```
 
-### Hugging Face VLM (spb2)
+### Hugging Face VLM (spb2vl)
 
 #### Setup suggestion
 
