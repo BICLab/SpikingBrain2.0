@@ -1,7 +1,6 @@
 # SpikingBrain2.0：Brain-Inspired Foundation Models 
-**Hybrid Sparse Attention, Dual Quantization Paths, and Multimodal Conversion**
+**Efffcient Long-Context, Cross-Platform Inference**
 
-📄 Technical Report: [English]()  
 🚀 Arxiv: [arXiv:](https://www.arxiv.org/abs/)  
 🧩 Models: [Available Models](#available-models)      
 
@@ -9,9 +8,11 @@
 
 ## About SpikingBrain2.0
 
-SpikingBrain2.0 is a brain-inspired hybrid model family for long-context language modeling and vision-language modeling. Building on  [SpikingBrain1.0](https://github.com/BICLab/SpikingBrain-7B), it adopts an inter-layer hybrid architecture that combines Sparse Softmax Attention ([MoBA](https://github.com/MoonshotAI/MoBA)) with Sparse Linear Attention ([SSE](https://openreview.net/pdf?id=R6DrJ4tnGV)), forming a sparse-memory design that better balances modeling quality, long-context efficiency, and memory usage while alleviating contextual interference in long sequences. It is further supported by a lightweight Transformer-to-Hybrid (T2H) conversion pipeline, enabling both LLMs and VLMs to be adapted from open-source Qwen3 backbones at very low cost; With fewer than 7k A100 GPU hours, it recovers most of the backbone models’ capabilities and achieves competitive results across general, reasoning, and vision-language benchmarks. 
+SpikingBrain2.0 (SpB2.0) is a brain-inspired hybrid model family for efficient long-context language modeling and vision-language modeling. Building on [SpikingBrain1.0](https://github.com/BICLab/SpikingBrain-7B), SpB2.0 introduces **Dual-Space Sparse Attention (DSSA)**, an inter-layer hybrid architecture that combines Sparse Softmax Attention ([MoBA](https://arxiv.org/abs/2502.13189)) with Sparse Linear Attention ([SSE](https://arxiv.org/abs/2507.16577)). This sparse-memory design improves the performance-efficiency trade-off for long-context modeling while reducing memory usage and alleviating contextual interference in long sequences.
 
-Beyond capability recovery, SpikingBrain2.0 delivers substantial deployment advantages, including up to 10.13× TTFT speedup at 4M context length, support for 10M+ token serving on 8×A100 GPUs, and dual FP8 and INT8-Spiking quantization paths for both practical GPU acceleration and neuromorphic-friendly execution. Notably, the INT8-Spiking path achieves 64.31% spike-sequence sparsity with minimal accuracy loss, while hardware simulation shows about 46.5%–48.1% power reduction, making SpikingBrain2.0 a lightweight, scalable, and energy-efficient solution for building efficient long-context foundation models.
+SpB2.0 further provides an optimized **Transformer-to-Hybrid (T2H)** conversion pipeline with dual conversion paths for both LLMs and VLMs. Starting from open-source Qwen3 backbones, SpB2.0-5B and SpB2.0-VL-5B recover most of the capabilities of their base Transformer models with fewer than 7k A100 GPU hours of additional training, achieving competitive performance across general, reasoning, long-context, and vision-language benchmarks.
+
+Beyond capability recovery, SpB2.0 offers substantial deployment advantages. Under sequence parallelism, it achieves up to **10.13× TTFT speedup** at 4M context length; under vLLM, it supports serving beyond **10M tokens on 8 A100 GPUs**, where the full-attention baseline exceeds memory limits. SpB2.0 also supports two quantization paths: **FP8** inference for practical acceleration on modern GPUs, reaching **2.52× speedup** at 250k context length, and **INT8-Spiking** coding for sparse event-driven execution on neuromorphic hardware. The INT8-Spiking path achieves **64.31% spike-sequence sparsity** with minimal accuracy loss, while hardware simulation shows **70.6% area reduction** and **46.5% power reduction** at 500MHz.
 
 ![](assets/fig1.png)
 
@@ -36,7 +37,7 @@ This repository includes two important local dependency trees.
 
 `flash-linear-attention_dev/` contains a modified version of flash-linear-attention with added SSE support.
 
-In SpikingBrain2.0, [SSE](https://openreview.net/pdf?id=R6DrJ4tnGV) is built as a **Sparse State Expansion** mechanism over [Gated DeltaNet](https://openreview.net/pdf?id=r8H7xhYPwz). By extending the compressed recurrent memory of Gated DeltaNet into multiple sparsely updated state partitions, SSE improves effective memory capacity and long-context retrieval while largely preserving the efficiency benefits of recurrent linear modeling.
+In SpikingBrain2.0, [SSE](https://arxiv.org/abs/2507.16577) is built as a **Sparse State Expansion** mechanism over [Gated DeltaNet](https://arxiv.org/abs/2412.06464). By extending the compressed recurrent memory of Gated DeltaNet into multiple sparsely updated state partitions, SSE improves effective memory capacity and long-context retrieval while largely preserving the efficiency benefits of recurrent linear modeling.
 
 ---
 
