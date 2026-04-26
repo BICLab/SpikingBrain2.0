@@ -10,11 +10,7 @@
 
 ![](assets/fig1.png)
 
-SpikingBrain2.0 (SpB2.0) is a brain-inspired hybrid model family for efficient long-context language modeling(**SpB2.0-5B**) and vision-language modeling(**SpB2.0-VL-5B**). Building on [SpikingBrain1.0](https://github.com/BICLab/SpikingBrain-7B), SpB2.0 introduces **Dual-Space Sparse Attention (DSSA)**, an inter-layer hybrid architecture that combines Sparse Softmax Attention ([MoBA](https://arxiv.org/abs/2502.13189)) with Sparse Linear Attention ([SSE](https://arxiv.org/abs/2507.16577)). This sparse-memory design improves the performance-efficiency trade-off for long-context modeling while reducing memory usage and alleviating contextual interference in long sequences.
-
-SpB2.0 further provides an optimized **Transformer-to-Hybrid (T2H)** conversion pipeline with dual conversion paths for both LLMs and VLMs. Starting from open-source Qwen3 backbones, SpB2.0-5B and SpB2.0-VL-5B recover most of the capabilities of their base Transformer models with fewer than 7k A100 GPU hours of additional training, achieving competitive performance across general, reasoning, long-context, and vision-language benchmarks.
-
-Beyond capability recovery, SpB2.0 offers substantial deployment advantages. Under sequence parallelism, it achieves up to **10.13× TTFT speedup** at 4M context length; under vLLM, it supports serving beyond **10M tokens on 8 A100 GPUs**, where the full-attention baseline exceeds memory limits. SpB2.0 also supports two quantization paths: **FP8** inference for practical acceleration on modern GPUs, reaching **2.52× speedup** at 250k context length, and **INT8-Spiking** coding for sparse event-driven execution on neuromorphic hardware. The INT8-Spiking path achieves **64.31% spike-sequence sparsity** with minimal accuracy loss, while hardware simulation shows **70.6% area reduction** and **46.5% power reduction** at 500MHz.
+SpikingBrain2.0 advances brain-inspired hybrid foundation modeling with two 5B-scale models, **SpB2.0-5B** and **SpB2.0-VL-5B**. Its architecture introduces **Dual-Space Sparse Attention (DSSA)**, an inter-layer hybrid of Sparse Softmax Attention ([MoBA](https://arxiv.org/abs/2502.13189)) and Sparse Linear Attention ([SSE](https://arxiv.org/abs/2507.16577)), together with **Dual-Path Activation Coding**, which supports both FP8 GPU inference and INT8-Spiking event-driven computation. On the training side, SpikingBrain2.0 develops an optimized **Transformer-to-Hybrid (T2H)** conversion pipeline for LLM and VLM, enabling efficient migration from open-source Transformer backbones. Empirically, SpB2.0 recovers most of the base Transformer capability while achieving a **10.13× TTFT speedup** at 4M context length, with its spiking computation path further showing potential for low-power neuromorphic deployment.
 
 
 ## Repository Structure
@@ -27,6 +23,7 @@ SpikingBrain2.0/
 ├── flash-linear-attention_dev/  # Customized flash-linear-attention with SSE support
 ├── MoBA/                        # Customized MoBA adapted to the newer FlashAttention interface
 ├── run_model/                   # Example scripts for running models with the released checkpoints
+├── run_model_forward/           # Example scripts for forward / training step with the released checkpoints
 └── README.md
 ```
 
@@ -105,12 +102,14 @@ Model weights are hosted on **ModelScope**:
 
 ### Usage
 
-Example scripts are provided in [`run_model/`](run_model) for running the released checkpoints.
+Example scripts are provided in [`run_model/`](run_model) (text generation) and [`run_model_forward/`](run_model_forward) (forward / training step) for running the released checkpoints.
 
 - **Hugging Face**  
-  Load the model with `AutoModelForCausalLM` and use it as a standard CausalLM for either forward passes or text generation; see [`run_model/run_model_hf_base.py`](run_model/run_model_hf_base.py).  
-  For the SFT model, use the chat template script; see [`run_model/run_model_hf_chat.py`](run_model/run_model_hf_chat.py).  
-  For the vision-language model, see [`run_model/run_model_hf_vl.py`](run_model/run_model_hf_vl.py).
+  Load the model with `AutoModelForCausalLM` and use it as a standard CausalLM. For text generation, see [`run_model/run_model_hf_base.py`](run_model/run_model_hf_base.py); for a forward pass (loss / logits), see [`run_model_forward/run_model_hf_base.py`](run_model_forward/run_model_hf_base.py). 
+
+  For the SFT model, use the chat template scripts; see [`run_model/run_model_hf_chat.py`](run_model/run_model_hf_chat.py) for generation and [`run_model_forward/run_model_hf_chat.py`](run_model_forward/run_model_hf_chat.py) for a forward pass.  
+
+  For the vision-language model, see [`run_model/run_model_hf_vl.py`](run_model/run_model_hf_vl.py) for generation and [`run_model_forward/run_model_hf_vl.py`](run_model_forward/run_model_hf_vl.py) for a forward pass.
 
 - **vLLM**  
   Run inference with the provided **spb2_vllm** plugin; see [`run_model/run_model_vllm.py`](run_model/run_model_vllm.py) and [`run_model/run_model_vllm_vl.py`](run_model/run_model_vllm_vl.py).  
@@ -168,4 +167,3 @@ If you find our work useful, please consider citing SpikingBrain2.0:
 }
 
 ```
-
