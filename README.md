@@ -9,7 +9,7 @@
   <h3>Efficient Long-Context and Cross-Platform Inference</h3>
 
   <p>
-    <a href="https://arxiv.org/abs/2604.22575">📑 Technical Report</a>
+    <a href="https://arxiv.org/abs/2604.22575">📑 Paper</a>
     &emsp;
     <a href="#available-models">🤖 ModelScope</a>
   </p>
