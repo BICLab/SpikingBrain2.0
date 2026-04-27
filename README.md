@@ -1,8 +1,9 @@
-# SpikingBrain2.0：Brain-Inspired Foundation Models 
-**Efficient Long-Context and Cross-Platform Inference**
+<div align="center">
+ <h1> SpikingBrain2.0: Brain-Inspired Foundation Models for Efficient Long-Context and Cross-Platform Inference </h1>
 
-📄 Technical Report: [arXiv:2604.22575](https://arxiv.org/abs/2604.22575)  
-🤖 Models: [Available Models](#available-models)      
+  [[📑 Technical Report ](https://arxiv.org/abs/2604.22575)] &emsp; [[🤖 ModelScope](#available-models)]
+
+</div>   
 
 ---
 
