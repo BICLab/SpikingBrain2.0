@@ -1,9 +1,9 @@
 <div align="center">
   <h1>SpikingBrain2.0: Brain-Inspired Foundation Models</h1>
-  <h3>Efficient Long-Context and Cross-Platform Inference</h3>
+  <p><em>Efficient Long-Context and Cross-Platform Inference</em></p>
 
   [[📑 Technical Report ](https://arxiv.org/abs/2604.22575)] &emsp; [[🤖 ModelScope](#available-models)]
-</div>  
+</div>
 
 ---
 
