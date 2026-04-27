@@ -1,7 +1,7 @@
 # SpikingBrain2.0：Brain-Inspired Foundation Models 
 **Efficient Long-Context and Cross-Platform Inference**
 
-📄 Arxiv: [arXiv](https://www.arxiv.org/abs/)  
+📄 Technical Report: [arXiv:2604.22575](https://arxiv.org/abs/2604.22575)  
 🤖 Models: [Available Models](#available-models)      
 
 ---
@@ -159,9 +159,9 @@ If you find our work useful, please consider citing SpikingBrain2.0:
 
 ```bibtex
 @article{pan2026spikingbrain2.0,
-  title={SpikingBrain2.0},
-  author={},
-  journal={arXiv preprint arXiv:},
+  title={SpikingBrain2.0: Brain-Inspired Foundation Models for Efficient Long-Context and Cross-Platform Inference},
+  author={Pan, Yuqi and Zhuang, Jinghao and Feng, Yupeng and Zhong, Fangzhi and Ding, Siyu and Qiu, Xuerui and Gu, Shaowei and Sun, Bohan and Qin, Zhiyong and Zhong, Yibo and Ouyang, Lingtao and Yang, Kun and Liu, Zehao and Chou, Yuhong and Wang, Shurong and Hu, Anjie and Xu, Han and Xu, Bo and Li, Guoqi},
+  journal={arXiv preprint arXiv:2604.22575},
   year={2026}
 }
 
