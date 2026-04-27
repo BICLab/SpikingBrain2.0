@@ -1,8 +1,15 @@
 <div align="center">
   <h1>SpikingBrain2.0: Brain-Inspired Foundation Models</h1>
+
+  <img src="assets/logo.png" alt="SpikingBrain2.0 Logo" width="520">
+
   <h3>Efficient Long-Context and Cross-Platform Inference</h3>
 
-  [[📑 Technical Report ](https://arxiv.org/abs/2604.22575)] &emsp; [[🤖 ModelScope](#available-models)]
+  <p>
+    <a href="https://arxiv.org/abs/2604.22575">📑 Technical Report</a>
+    &emsp;
+    <a href="#available-models">🤖 ModelScope</a>
+  </p>
 </div>
 
 ---
