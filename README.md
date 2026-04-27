@@ -1,7 +1,7 @@
 <div align="center">
   <h1>SpikingBrain2.0: Brain-Inspired Foundation Models</h1>
 
-    <img src="assets/logo.png" alt="SpikingBrain2.0 Logo" width="320">
+  <img src="assets/logo.png" alt="SpikingBrain2.0 Logo" width="320">
 
   <h3>Efficient Long-Context and Cross-Platform Inference</h3>
 
